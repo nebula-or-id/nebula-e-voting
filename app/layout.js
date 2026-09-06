@@ -1,0 +1,12 @@
+export const metadata = {
+  title: "NEBULA E-Voting",
+  description: "Sistem E-Voting NEBULA",
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="id">
+      <body>{children}</body>
+    </html>
+  );
+}
