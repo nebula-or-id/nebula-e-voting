@@ -1,3 +1,5 @@
+import "./globals.css";
+
 export const metadata = {
   title: "NEBULA E-Voting",
   description: "Sistem E-Voting NEBULA",
