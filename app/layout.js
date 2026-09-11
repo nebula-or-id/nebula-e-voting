@@ -1,8 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "NEBULA E-Voting",
-  description: "Sistem E-Voting NEBULA",
+  title: "Pemilihan Ketua KIR Nebula 2026/2027",
+  description:
+    "NEBULA E-Voting - Pemilihan Ketua KIR Nebula Periode 2026/2027",
 };
 
 export default function RootLayout({ children }) {
