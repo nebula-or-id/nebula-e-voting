@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
-import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import AdminDashboard from "./AdminDashboard";
 
 async function createSupabaseServerClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
@@ -26,7 +27,7 @@ async function createSupabaseServerClient() {
               }
             );
           } catch {
-            // Cookie tidak selalu dapat ditulis
+            // Tidak selalu dapat menulis cookie
             // dari Server Component.
           }
         },
@@ -43,14 +44,60 @@ export default async function AdminPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Belum login → kembali ke halaman login admin
   if (!user) {
     redirect("/admin/login");
+  }
+
+  // ----------------------------------------------------
+  // Untuk tahap sekarang kita hanya mengizinkan akun
+  // admin@nebula.or.id
+  // ----------------------------------------------------
+
+  if (user.email !== "admin@nebula.or.id") {
+    redirect("/");
+  }
+
+  // ----------------------------------------------------
+  // Ambil data election
+  // ----------------------------------------------------
+
+  const { data: election, error } =
+    await supabase
+      .from("elections")
+      .select(
+        "id, name, description, status, opened_at, closed_at"
+      )
+      .eq(
+        "name",
+        "Pemilihan Ketua KIR Nebula Periode 2026/2027"
+      )
+      .limit(1)
+      .single();
+
+  if (error || !election) {
+    return (
+      <main className="page">
+        <section className="card">
+          <div className="badge">
+            NEBULA E-VOTING
+          </div>
+
+          <h1>Admin Dashboard</h1>
+
+          <div className="info">
+            <p>
+              Data pemilihan tidak ditemukan.
+            </p>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
     <main className="page">
       <section className="card">
+
         <div className="badge">
           NEBULA E-VOTING
         </div>
@@ -58,31 +105,14 @@ export default async function AdminPage() {
         <h1>Admin Dashboard</h1>
 
         <p className="subtitle">
-          Pemilihan Ketua KIR Nebula
-          <br />
-          Periode 2026/2027
+          Panel administrasi pemilihan
         </p>
 
-        <div className="info">
-          <p>
-            <strong>Admin:</strong>{" "}
-            {user.email}
-          </p>
+        <AdminDashboard
+          initialStatus={election.status}
+          electionName={election.name}
+        />
 
-          <p>
-            <strong>Status Sistem:</strong>{" "}
-            Terhubung
-          </p>
-        </div>
-
-        <h2 style={{ marginTop: "30px" }}>
-          Pengelolaan Pemilihan
-        </h2>
-
-        <p className="subtitle">
-          Dashboard administrasi akan kita bangun
-          pada langkah berikutnya.
-        </p>
       </section>
     </main>
   );
