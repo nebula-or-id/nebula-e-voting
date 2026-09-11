@@ -11,14 +11,9 @@ export default function AdminDashboard({
   participation,
   totalBallots,
 }) {
-  const [status, setStatus] =
-    useState(initialStatus);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [message, setMessage] =
-    useState("");
+  const [status, setStatus] = useState(initialStatus);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   async function changeStatus(action) {
     const confirmMessage =
@@ -26,8 +21,7 @@ export default function AdminDashboard({
         ? "Yakin ingin membuka pemilihan? Setelah dibuka, pemilih dapat mulai memberikan suara."
         : "Yakin ingin menutup pemilihan? Setelah ditutup, pemilih tidak dapat mengirim suara baru.";
 
-    const confirmed =
-      window.confirm(confirmMessage);
+    const confirmed = window.confirm(confirmMessage);
 
     if (!confirmed) {
       return;
@@ -44,244 +38,204 @@ export default function AdminDashboard({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            action,
-          }),
+          body: JSON.stringify({ action }),
         }
       );
 
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        setMessage(
-          data.message ||
-            "Perubahan status gagal."
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Gagal mengubah status."
         );
-        return;
       }
 
       setStatus(data.status);
-
       setMessage(
-        data.status === "open"
+        action === "open"
           ? "Pemilihan berhasil dibuka."
           : "Pemilihan berhasil ditutup."
       );
     } catch (error) {
-      console.error(error);
-
       setMessage(
-        "Tidak dapat terhubung ke server."
+        error.message ||
+          "Terjadi kesalahan."
       );
     } finally {
       setLoading(false);
     }
   }
 
-  const statusLabel = {
-    draft: "DRAFT",
-    open: "OPEN",
-    closed: "CLOSED",
-  };
+  async function prepareElection() {
+    const confirmed = window.confirm(
+      "SIAPKAN PEMILIHAN?\n\n" +
+        "Tindakan ini akan:\n" +
+        "• Menghapus seluruh ballot voting.\n" +
+        "• Menghapus ranking ballot.\n" +
+        "• Menghapus session voting.\n" +
+        "• Mengembalikan status semua pemilih menjadi belum memilih.\n" +
+        "• Mengembalikan status pemilihan menjadi DRAFT.\n\n" +
+        "Data pemilih, kandidat, dan kategori pemilih TIDAK dihapus.\n\n" +
+        "Lanjutkan?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        "/api/prepare-election",
+        {
+          method: "POST",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Gagal menyiapkan pemilihan."
+        );
+      }
+
+      setStatus("draft");
+
+      setMessage(
+        "Pemilihan berhasil disiapkan kembali. Status sekarang DRAFT."
+      );
+
+      // Refresh halaman agar seluruh statistik ikut diperbarui
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      setMessage(
+        error.message ||
+          "Terjadi kesalahan saat menyiapkan pemilihan."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div>
+    <main className="page">
+      <section className="card">
+        <div className="badge">
+          NEBULA E-VOTING
+        </div>
 
-      {/* STATUS */}
-      <div className="info">
-        <p>
-          <strong>Pemilihan</strong>
+        <h1>Admin Dashboard</h1>
+
+        <p className="subtitle">
+          Panel administrasi pemilihan
         </p>
-
-        <p>{electionName}</p>
-
-        <p style={{ marginTop: "20px" }}>
-          <strong>Status</strong>
-        </p>
-
-        <p
-          style={{
-            fontSize: "24px",
-            fontWeight: "700",
-          }}
-        >
-          {statusLabel[status]}
-        </p>
-      </div>
-
-
-      {/* STATISTIK */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: "12px",
-          marginTop: "20px",
-        }}
-      >
 
         <div className="info">
-          <p
-            style={{
-              fontSize: "13px",
-              color: "#667085",
-            }}
-          >
-            Total Pemilih
-          </p>
-
-          <p
-            style={{
-              fontSize: "28px",
-              fontWeight: "700",
-              margin: "8px 0 0",
-            }}
-          >
-            {totalVoters}
-          </p>
+          <strong>Pemilihan:</strong>
+          <br />
+          {electionName}
         </div>
-
 
         <div className="info">
-          <p
-            style={{
-              fontSize: "13px",
-              color: "#667085",
-            }}
-          >
-            Sudah Memilih
-          </p>
-
-          <p
-            style={{
-              fontSize: "28px",
-              fontWeight: "700",
-              margin: "8px 0 0",
-            }}
-          >
-            {votedVoters}
-          </p>
+          <strong>Status:</strong>{" "}
+          {status.toUpperCase()}
         </div>
 
+        <div className="stats">
+          <div className="stat-card">
+            <span>Total Pemilih</span>
+            <strong>{totalVoters}</strong>
+          </div>
 
-        <div className="info">
-          <p
-            style={{
-              fontSize: "13px",
-              color: "#667085",
-            }}
-          >
-            Belum Memilih
-          </p>
+          <div className="stat-card">
+            <span>Sudah Memilih</span>
+            <strong>{votedVoters}</strong>
+          </div>
 
-          <p
-            style={{
-              fontSize: "28px",
-              fontWeight: "700",
-              margin: "8px 0 0",
-            }}
-          >
-            {notVotedVoters}
-          </p>
+          <div className="stat-card">
+            <span>Belum Memilih</span>
+            <strong>{notVotedVoters}</strong>
+          </div>
+
+          <div className="stat-card">
+            <span>Partisipasi</span>
+            <strong>
+              {Number(participation).toFixed(2)}%
+            </strong>
+          </div>
+
+          <div className="stat-card">
+            <span>Total Ballot</span>
+            <strong>{totalBallots}</strong>
+          </div>
         </div>
 
+        <div className="admin-actions">
+          <h2>Kontrol Pemilihan</h2>
 
-        <div className="info">
-          <p
-            style={{
-              fontSize: "13px",
-              color: "#667085",
-            }}
+          <button
+            type="button"
+            onClick={prepareElection}
+            disabled={loading}
           >
-            Partisipasi
-          </p>
+            {loading
+              ? "Memproses..."
+              : "⚙️ Siapkan Pemilihan"}
+          </button>
 
-          <p
-            style={{
-              fontSize: "28px",
-              fontWeight: "700",
-              margin: "8px 0 0",
-            }}
-          >
-            {participation}%
-          </p>
+          {status === "draft" && (
+            <button
+              type="button"
+              onClick={() =>
+                changeStatus("open")
+              }
+              disabled={loading}
+            >
+              {loading
+                ? "Memproses..."
+                : "🟢 Buka Pemilihan"}
+            </button>
+          )}
+
+          {status === "open" && (
+            <button
+              type="button"
+              onClick={() =>
+                changeStatus("close")
+              }
+              disabled={loading}
+            >
+              {loading
+                ? "Memproses..."
+                : "🔴 Tutup Pemilihan"}
+            </button>
+          )}
+
+          {status === "closed" && (
+            <p className="closed-message">
+              Pemilihan sudah ditutup.
+              Gunakan tombol{" "}
+              <strong>
+                Siapkan Pemilihan
+              </strong>{" "}
+              untuk mengembalikan pemilihan
+              ke kondisi DRAFT.
+            </p>
+          )}
+
+          {message && (
+            <div className="message">
+              {message}
+            </div>
+          )}
         </div>
-
-      </div>
-
-
-      {/* TOTAL BALLOT */}
-      <div
-        className="info"
-        style={{ marginTop: "12px" }}
-      >
-        <p>
-          <strong>Total Ballot Tercatat</strong>
-        </p>
-
-        <p
-          style={{
-            fontSize: "24px",
-            fontWeight: "700",
-          }}
-        >
-          {totalBallots}
-        </p>
-      </div>
-
-
-      {/* KONTROL PEMILIHAN */}
-
-      {status === "draft" && (
-        <button
-          type="button"
-          onClick={() =>
-            changeStatus("open")
-          }
-          disabled={loading}
-        >
-          {loading
-            ? "Membuka..."
-            : "Buka Pemilihan"}
-        </button>
-      )}
-
-      {status === "open" && (
-        <button
-          type="button"
-          onClick={() =>
-            changeStatus("close")
-          }
-          disabled={loading}
-        >
-          {loading
-            ? "Menutup..."
-            : "Tutup Pemilihan"}
-        </button>
-      )}
-
-      {status === "closed" && (
-        <div
-          className="info"
-          style={{ marginTop: "20px" }}
-        >
-          <p>
-            🔒 Pemilihan telah ditutup.
-          </p>
-        </div>
-      )}
-
-
-      {message && (
-        <div
-          className="info"
-          style={{ marginTop: "20px" }}
-        >
-          <p>{message}</p>
-        </div>
-      )}
-
-    </div>
+      </section>
+    </main>
   );
 }
