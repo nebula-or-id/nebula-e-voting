@@ -88,7 +88,7 @@ export default function AdminDashboard({
     useRef(null);
 
   // ====================================================
-  // LOAD KANDIDAT SAAT HALAMAN DIBUKA
+  // LOAD KANDIDAT
   // ====================================================
 
   useEffect(() => {
@@ -393,6 +393,7 @@ export default function AdminDashboard({
       );
 
     link.href = url;
+
     link.download =
       "token-pemilih-nebula.csv";
 
@@ -456,14 +457,21 @@ export default function AdminDashboard({
           StandardFonts.HelveticaBold
         );
 
-      // Ukuran A4 dalam point
+      // ==================================================
+      // UKURAN A4
+      // ==================================================
+
       const pageWidth =
         595.28;
 
       const pageHeight =
         841.89;
 
-      // Layout 2 kolom x 4 baris
+      // ==================================================
+      // GRID KARTU
+      // 2 kolom x 4 baris
+      // ==================================================
+
       const columns = 2;
       const rowsPerPage = 4;
 
@@ -482,7 +490,10 @@ export default function AdminDashboard({
           gap * 3) /
         rowsPerPage;
 
-      // Warna sederhana dan ramah printer
+      // ==================================================
+      // WARNA
+      // ==================================================
+
       const dark =
         rgb(
           0.09,
@@ -518,13 +529,21 @@ export default function AdminDashboard({
           1
         );
 
+      // ==================================================
+      // BUAT SETIAP KARTU
+      // ==================================================
+
       importResult.voters.forEach(
         (voter, index) => {
+          const cardsPerPage =
+            columns *
+            rowsPerPage;
+
           const indexInPage =
             index %
-            (columns *
-              rowsPerPage);
+            cardsPerPage;
 
+          // Buat halaman baru
           if (
             indexInPage === 0
           ) {
@@ -534,15 +553,13 @@ export default function AdminDashboard({
             ]);
           }
 
-          const pageCount =
-            pdfDoc.getPageCount();
-
           const page =
             pdfDoc.getPage(
-              pageCount - 1
+              pdfDoc.getPageCount() -
+                1
             );
 
-          const col =
+          const column =
             indexInPage %
             columns;
 
@@ -554,7 +571,7 @@ export default function AdminDashboard({
 
           const x =
             margin +
-            col *
+            column *
               (cardWidth +
                 gap);
 
@@ -565,7 +582,10 @@ export default function AdminDashboard({
               cardHeight -
             row * gap;
 
-          // Kotak kartu
+          // =================================================
+          // KOTAK UTAMA
+          // =================================================
+
           page.drawRectangle({
             x,
             y,
@@ -578,7 +598,10 @@ export default function AdminDashboard({
             borderWidth: 1,
           });
 
-          // Header
+          // =================================================
+          // HEADER
+          // =================================================
+
           page.drawRectangle({
             x:
               x + 8,
@@ -628,11 +651,23 @@ export default function AdminDashboard({
             }
           );
 
-          // Label identitas
+          // =================================================
+          // IDENTITAS
+          // =================================================
+
           const left =
             x + 16;
 
-          let textY =
+          const right =
+            x +
+            cardWidth -
+            16;
+
+          // -----------------------------
+          // NAMA
+          // -----------------------------
+
+          let identityY =
             y +
             cardHeight -
             65;
@@ -641,7 +676,7 @@ export default function AdminDashboard({
             "NAMA",
             {
               x: left,
-              y: textY,
+              y: identityY,
               size: 6.5,
               font:
                 fontBold,
@@ -650,33 +685,42 @@ export default function AdminDashboard({
             }
           );
 
-          textY -= 13;
+          identityY -= 13;
+
+          const voterName =
+            String(
+              voter.nama ??
+                voter.name ??
+                ""
+            ).trim();
+
+          const safeName =
+            voterName || "-";
 
           page.drawText(
-            String(
-              voter.nama
-            ),
+            safeName,
             {
               x: left,
-              y: textY,
+              y: identityY,
               size: 9,
               font:
                 fontBold,
               color:
                 dark,
-              maxWidth:
-                cardWidth -
-                32,
             }
           );
 
-          textY -= 25;
+          // -----------------------------
+          // NISN
+          // -----------------------------
+
+          identityY -= 24;
 
           page.drawText(
             "NISN",
             {
               x: left,
-              y: textY,
+              y: identityY,
               size: 6.5,
               font:
                 fontBold,
@@ -685,15 +729,23 @@ export default function AdminDashboard({
             }
           );
 
-          textY -= 13;
+          identityY -= 13;
+
+          const voterNisn =
+            String(
+              voter.nisn ??
+                voter.voter_code ??
+                ""
+            ).trim();
+
+          const safeNisn =
+            voterNisn || "-";
 
           page.drawText(
-            String(
-              voter.nisn
-            ),
+            safeNisn,
             {
               x: left,
-              y: textY,
+              y: identityY,
               size: 8.5,
               font:
                 fontRegular,
@@ -702,12 +754,15 @@ export default function AdminDashboard({
             }
           );
 
-          // Area token
+          // =================================================
+          // AREA TOKEN
+          // =================================================
+
           const tokenBoxHeight =
-            57;
+            54;
 
           const tokenBoxY =
-            y + 42;
+            y + 40;
 
           page.drawRectangle({
             x:
@@ -745,22 +800,26 @@ export default function AdminDashboard({
 
           const token =
             String(
-              voter.token
-            );
+              voter.token ??
+                ""
+            ).trim();
+
+          const safeToken =
+            token || "-";
 
           const tokenSize =
-            token.length > 10
+            safeToken.length > 10
               ? 15
               : 17;
 
           const tokenWidth =
             fontBold.widthOfTextAtSize(
-              token,
+              safeToken,
               tokenSize
             );
 
           page.drawText(
-            token,
+            safeToken,
             {
               x:
                 x +
@@ -776,19 +835,18 @@ export default function AdminDashboard({
                 fontBold,
               color:
                 dark,
-              characterSpacing:
-                1.5,
             }
           );
 
-          // Footer
+          // =================================================
+          // FOOTER
+          // =================================================
+
           page.drawText(
             "Gunakan token ini satu kali untuk memberikan suara.",
             {
-              x:
-                left,
-              y:
-                y + 18,
+              x: left,
+              y: y + 18,
               size: 6,
               font:
                 fontRegular,
@@ -801,9 +859,7 @@ export default function AdminDashboard({
             `Kartu ${index + 1}`,
             {
               x:
-                x +
-                cardWidth -
-                48,
+                right - 42,
               y:
                 y + 18,
               size: 5.5,
@@ -816,7 +872,10 @@ export default function AdminDashboard({
         }
       );
 
-      // Simpan PDF
+      // ==================================================
+      // SIMPAN PDF
+      // ==================================================
+
       const pdfBytes =
         await pdfDoc.save();
 
@@ -950,7 +1009,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // BUKA FORM TAMBAH
+  // TAMBAH KANDIDAT
   // ====================================================
 
   function openCandidateForm() {
@@ -968,7 +1027,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // BUKA FORM EDIT
+  // EDIT KANDIDAT
   // ====================================================
 
   function openEditCandidate(
@@ -1339,6 +1398,8 @@ export default function AdminDashboard({
           pemilihan
         </p>
 
+        {/* INFO PEMILIHAN */}
+
         <div className="info">
           <strong>
             Pemilihan:
@@ -1362,7 +1423,6 @@ export default function AdminDashboard({
             <span>
               Total Pemilih
             </span>
-
             <strong>
               {totalVoters}
             </strong>
@@ -1372,7 +1432,6 @@ export default function AdminDashboard({
             <span>
               Sudah Memilih
             </span>
-
             <strong>
               {votedVoters}
             </strong>
@@ -1382,7 +1441,6 @@ export default function AdminDashboard({
             <span>
               Belum Memilih
             </span>
-
             <strong>
               {notVotedVoters}
             </strong>
@@ -1392,7 +1450,6 @@ export default function AdminDashboard({
             <span>
               Partisipasi
             </span>
-
             <strong>
               {Number(
                 participation
@@ -1405,7 +1462,6 @@ export default function AdminDashboard({
             <span>
               Total Ballot
             </span>
-
             <strong>
               {totalBallots}
             </strong>
@@ -1509,12 +1565,16 @@ export default function AdminDashboard({
           </p>
 
           <div className="info">
+
             <strong>
               Format file:
             </strong>
+
             <br />
+
             NISN | Nama |
             Kategori
+
             <br />
             <br />
 
@@ -1522,6 +1582,7 @@ export default function AdminDashboard({
               Status pemilihan
               harus DRAFT.
             </strong>
+
           </div>
 
           <input
@@ -1663,6 +1724,8 @@ export default function AdminDashboard({
                   : "Tambah Kandidat"}
               </h3>
 
+              {/* PREVIEW FOTO */}
+
               <div className="candidate-photo-preview-area">
 
                 {candidatePhotoPreview ? (
@@ -1697,59 +1760,59 @@ export default function AdminDashboard({
               />
 
               <small>
-                JPG, PNG, atau WEBP.
-                Maksimal 5 MB.
+                JPG, PNG, atau
+                WEBP. Maksimal 5 MB.
                 Standar tampilan
                 3:4.
               </small>
 
               {editingCandidate &&
                 editingCandidate.photo_url && (
-                  <label className="photo-remove-option">
+                <label className="photo-remove-option">
 
-                    <input
-                      type="checkbox"
-                      checked={
-                        removeExistingPhoto
-                      }
-                      onChange={(
-                        event
-                      ) => {
-                        const checked =
-                          event.target
-                            .checked;
+                  <input
+                    type="checkbox"
+                    checked={
+                      removeExistingPhoto
+                    }
+                    onChange={(
+                      event
+                    ) => {
+                      const checked =
+                        event.target
+                          .checked;
 
-                        setRemoveExistingPhoto(
-                          checked
+                      setRemoveExistingPhoto(
+                        checked
+                      );
+
+                      if (checked) {
+                        setCandidatePhoto(
+                          null
                         );
 
-                        if (checked) {
-                          setCandidatePhoto(
-                            null
-                          );
+                        setCandidatePhotoPreview(
+                          null
+                        );
 
-                          setCandidatePhotoPreview(
-                            null
-                          );
-
-                          if (
-                            candidatePhotoRef.current
-                          ) {
-                            candidatePhotoRef.current.value =
-                              "";
-                          }
-                        } else {
-                          setCandidatePhotoPreview(
-                            editingCandidate.photo_url
-                          );
+                        if (
+                          candidatePhotoRef.current
+                        ) {
+                          candidatePhotoRef.current.value =
+                            "";
                         }
-                      }}
-                    />
+                      } else {
+                        setCandidatePhotoPreview(
+                          editingCandidate.photo_url
+                        );
+                      }
+                    }}
+                  />
 
-                    Hapus foto lama
+                  Hapus foto lama
 
-                  </label>
-                )}
+                </label>
+              )}
 
               <label>
                 Nomor Kandidat
