@@ -88,7 +88,7 @@ export default function AdminDashboard({
     useRef(null);
 
   // ====================================================
-  // LOAD KANDIDAT
+  // LOAD KANDIDAT SAAT HALAMAN DIBUKA
   // ====================================================
 
   useEffect(() => {
@@ -431,7 +431,7 @@ export default function AdminDashboard({
     const confirmed =
       window.confirm(
         "Buat Kartu Pemilih A4?\n\n" +
-          "PDF akan berisi kartu pemilih lengkap dengan NISN dan token.\n\n" +
+          "PDF akan berisi kartu pemilih lengkap dengan Nama, NISN, dan Token.\n\n" +
           "Setelah PDF selesai dibuat, simpan file tersebut dengan aman."
       );
 
@@ -468,8 +468,8 @@ export default function AdminDashboard({
         841.89;
 
       // ==================================================
-      // GRID KARTU
-      // 2 kolom x 4 baris
+      // LAYOUT
+      // 2 kolom x 4 baris = 8 kartu / halaman
       // ==================================================
 
       const columns = 2;
@@ -530,7 +530,7 @@ export default function AdminDashboard({
         );
 
       // ==================================================
-      // BUAT SETIAP KARTU
+      // KARTU
       // ==================================================
 
       importResult.voters.forEach(
@@ -543,7 +543,10 @@ export default function AdminDashboard({
             index %
             cardsPerPage;
 
-          // Buat halaman baru
+          // -------------------------------
+          // Halaman baru
+          // -------------------------------
+
           if (
             indexInPage === 0
           ) {
@@ -583,7 +586,7 @@ export default function AdminDashboard({
             row * gap;
 
           // =================================================
-          // KOTAK UTAMA
+          // KOTAK KARTU
           // =================================================
 
           page.drawRectangle({
@@ -652,25 +655,23 @@ export default function AdminDashboard({
           );
 
           // =================================================
-          // IDENTITAS
+          // DATA PEMILIH
           // =================================================
 
           const left =
             x + 16;
 
-          const right =
-            x +
-            cardWidth -
-            16;
-
-          // -----------------------------
-          // NAMA
-          // -----------------------------
+          // Kita buat posisi identitas lebih tinggi
+          // supaya tidak tertutup kotak TOKEN.
 
           let identityY =
             y +
             cardHeight -
-            65;
+            58;
+
+          // -----------------------------
+          // NAMA
+          // -----------------------------
 
           page.drawText(
             "NAMA",
@@ -685,7 +686,7 @@ export default function AdminDashboard({
             }
           );
 
-          identityY -= 13;
+          identityY -= 12;
 
           const voterName =
             String(
@@ -694,15 +695,12 @@ export default function AdminDashboard({
                 ""
             ).trim();
 
-          const safeName =
-            voterName || "-";
-
           page.drawText(
-            safeName,
+            voterName || "-",
             {
               x: left,
               y: identityY,
-              size: 9,
+              size: 8.8,
               font:
                 fontBold,
               color:
@@ -714,7 +712,7 @@ export default function AdminDashboard({
           // NISN
           // -----------------------------
 
-          identityY -= 24;
+          identityY -= 19;
 
           page.drawText(
             "NISN",
@@ -729,7 +727,7 @@ export default function AdminDashboard({
             }
           );
 
-          identityY -= 13;
+          identityY -= 12;
 
           const voterNisn =
             String(
@@ -738,11 +736,8 @@ export default function AdminDashboard({
                 ""
             ).trim();
 
-          const safeNisn =
-            voterNisn || "-";
-
           page.drawText(
-            safeNisn,
+            voterNisn || "-",
             {
               x: left,
               y: identityY,
@@ -755,14 +750,19 @@ export default function AdminDashboard({
           );
 
           // =================================================
-          // AREA TOKEN
+          // KOTAK TOKEN
           // =================================================
 
+          /*
+           * Token sengaja ditempatkan cukup rendah
+           * supaya tidak menutupi NISN.
+           */
+
           const tokenBoxHeight =
-            54;
+            48;
 
           const tokenBoxY =
-            y + 40;
+            y + 29;
 
           page.drawRectangle({
             x:
@@ -789,7 +789,7 @@ export default function AdminDashboard({
               y:
                 tokenBoxY +
                 tokenBoxHeight -
-                16,
+                15,
               size: 7,
               font:
                 fontBold,
@@ -809,8 +809,8 @@ export default function AdminDashboard({
 
           const tokenSize =
             safeToken.length > 10
-              ? 15
-              : 17;
+              ? 14
+              : 16;
 
           const tokenWidth =
             fontBold.widthOfTextAtSize(
@@ -828,13 +828,15 @@ export default function AdminDashboard({
                   2,
               y:
                 tokenBoxY +
-                16,
+                13,
               size:
                 tokenSize,
               font:
                 fontBold,
               color:
                 dark,
+              characterSpacing:
+                1.5,
             }
           );
 
@@ -846,8 +848,8 @@ export default function AdminDashboard({
             "Gunakan token ini satu kali untuk memberikan suara.",
             {
               x: left,
-              y: y + 18,
-              size: 6,
+              y: y + 13,
+              size: 5.5,
               font:
                 fontRegular,
               color:
@@ -859,9 +861,11 @@ export default function AdminDashboard({
             `Kartu ${index + 1}`,
             {
               x:
-                right - 42,
+                x +
+                cardWidth -
+                44,
               y:
-                y + 18,
+                y + 13,
               size: 5.5,
               font:
                 fontRegular,
@@ -1423,6 +1427,7 @@ export default function AdminDashboard({
             <span>
               Total Pemilih
             </span>
+
             <strong>
               {totalVoters}
             </strong>
@@ -1432,6 +1437,7 @@ export default function AdminDashboard({
             <span>
               Sudah Memilih
             </span>
+
             <strong>
               {votedVoters}
             </strong>
@@ -1441,6 +1447,7 @@ export default function AdminDashboard({
             <span>
               Belum Memilih
             </span>
+
             <strong>
               {notVotedVoters}
             </strong>
@@ -1450,6 +1457,7 @@ export default function AdminDashboard({
             <span>
               Partisipasi
             </span>
+
             <strong>
               {Number(
                 participation
@@ -1462,6 +1470,7 @@ export default function AdminDashboard({
             <span>
               Total Ballot
             </span>
+
             <strong>
               {totalBallots}
             </strong>
@@ -1760,8 +1769,8 @@ export default function AdminDashboard({
               />
 
               <small>
-                JPG, PNG, atau
-                WEBP. Maksimal 5 MB.
+                JPG, PNG, atau WEBP.
+                Maksimal 5 MB.
                 Standar tampilan
                 3:4.
               </small>
