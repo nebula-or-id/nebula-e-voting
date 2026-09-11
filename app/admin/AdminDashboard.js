@@ -59,6 +59,11 @@ export default function AdminDashboard({
   ] = useState(false);
 
   const [
+    editingCandidate,
+    setEditingCandidate,
+  ] = useState(null);
+
+  const [
     candidateNumber,
     setCandidateNumber,
   ] = useState("");
@@ -82,6 +87,16 @@ export default function AdminDashboard({
     candidatePhoto,
     setCandidatePhoto,
   ] = useState(null);
+
+  const [
+    candidatePhotoPreview,
+    setCandidatePhotoPreview,
+  ] = useState(null);
+
+  const [
+    removeExistingPhoto,
+    setRemoveExistingPhoto,
+  ] = useState(false);
 
   const candidatePhotoRef =
     useRef(null);
@@ -380,9 +395,7 @@ export default function AdminDashboard({
     );
 
     const url =
-      URL.createObjectURL(
-        blob
-      );
+      URL.createObjectURL(blob);
 
     const link =
       document.createElement(
@@ -457,15 +470,76 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // FORM KANDIDAT
+  // RESET FORM KANDIDAT
   // ====================================================
 
-  function openCandidateForm() {
+  function resetCandidateForm() {
     setCandidateNumber("");
     setCandidateName("");
     setCandidateClass("");
     setCandidateProgram("");
     setCandidatePhoto(null);
+    setCandidatePhotoPreview(null);
+    setRemoveExistingPhoto(false);
+
+    if (
+      candidatePhotoRef.current
+    ) {
+      candidatePhotoRef.current.value =
+        "";
+    }
+  }
+
+  // ====================================================
+  // BUKA FORM TAMBAH
+  // ====================================================
+
+  function openCandidateForm() {
+    resetCandidateForm();
+    setEditingCandidate(null);
+    setShowCandidateForm(true);
+  }
+
+  // ====================================================
+  // BUKA FORM EDIT
+  // ====================================================
+
+  function openEditCandidate(
+    candidate
+  ) {
+    setEditingCandidate(
+      candidate
+    );
+
+    setCandidateNumber(
+      String(
+        candidate.candidate_number
+      )
+    );
+
+    setCandidateName(
+      candidate.name || ""
+    );
+
+    setCandidateClass(
+      candidate.class_name ||
+        ""
+    );
+
+    setCandidateProgram(
+      candidate.vision || ""
+    );
+
+    setCandidatePhoto(null);
+
+    setCandidatePhotoPreview(
+      candidate.photo_url ||
+        null
+    );
+
+    setRemoveExistingPhoto(
+      false
+    );
 
     if (
       candidatePhotoRef.current
@@ -474,22 +548,60 @@ export default function AdminDashboard({
         "";
     }
 
-    setShowCandidateForm(
-      true
-    );
+    setShowCandidateForm(true);
   }
 
   function closeCandidateForm() {
-    setShowCandidateForm(
+    resetCandidateForm();
+    setEditingCandidate(null);
+    setShowCandidateForm(false);
+  }
+
+  // ====================================================
+  // PREVIEW FOTO
+  // ====================================================
+
+  function handlePhotoChange(
+    event
+  ) {
+    const file =
+      event.target.files?.[0] ||
+      null;
+
+    setCandidatePhoto(file);
+
+    if (!file) {
+      if (editingCandidate) {
+        setCandidatePhotoPreview(
+          editingCandidate.photo_url ||
+            null
+        );
+      } else {
+        setCandidatePhotoPreview(
+          null
+        );
+      }
+
+      return;
+    }
+
+    const previewUrl =
+      URL.createObjectURL(file);
+
+    setCandidatePhotoPreview(
+      previewUrl
+    );
+
+    setRemoveExistingPhoto(
       false
     );
   }
 
   // ====================================================
-  // TAMBAH KANDIDAT
+  // TAMBAH / EDIT KANDIDAT
   // ====================================================
 
-  async function addCandidate() {
+  async function saveCandidate() {
     if (status !== "draft") {
       setMessage(
         "Kandidat hanya dapat dikelola saat status DRAFT."
@@ -509,22 +621,26 @@ export default function AdminDashboard({
       return;
     }
 
+    const isEditing =
+      Boolean(editingCandidate);
+
+    const actionText =
+      isEditing
+        ? "memperbarui"
+        : "menambahkan";
+
     const confirmed =
       window.confirm(
-        `Simpan Kandidat ${candidateNumber}?\n\n` +
-          `Nama: ${candidateName}\n` +
-          `Kelas: ${candidateClass}\n\n` +
-          "Data kandidat akan disimpan."
+        isEditing
+          ? `Yakin ingin memperbarui Kandidat ${candidateNumber}?\n\nNama: ${candidateName}\nKelas: ${candidateClass}`
+          : `Yakin ingin menambahkan Kandidat ${candidateNumber}?\n\nNama: ${candidateName}\nKelas: ${candidateClass}`
       );
 
     if (!confirmed) {
       return;
     }
 
-    setCandidateLoading(
-      true
-    );
-
+    setCandidateLoading(true);
     setMessage("");
 
     try {
@@ -558,12 +674,114 @@ export default function AdminDashboard({
         );
       }
 
+      let response;
+
+      if (isEditing) {
+        formData.append(
+          "candidateId",
+          editingCandidate.id
+        );
+
+        formData.append(
+          "removePhoto",
+          String(
+            removeExistingPhoto
+          )
+        );
+
+        response =
+          await fetch(
+            "/api/candidates",
+            {
+              method: "PUT",
+              body: formData,
+            }
+          );
+      } else {
+        response =
+          await fetch(
+            "/api/candidates",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+      }
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Gagal ${actionText} kandidat.`
+        );
+      }
+
+      setMessage(
+        isEditing
+          ? "Kandidat berhasil diperbarui."
+          : "Kandidat berhasil ditambahkan."
+      );
+
+      closeCandidateForm();
+
+      await loadCandidates();
+    } catch (error) {
+      setMessage(
+        error.message ||
+          `Terjadi kesalahan saat ${actionText} kandidat.`
+      );
+    } finally {
+      setCandidateLoading(
+        false
+      );
+    }
+  }
+
+  // ====================================================
+  // HAPUS KANDIDAT
+  // ====================================================
+
+  async function deleteCandidate(
+    candidate
+  ) {
+    if (status !== "draft") {
+      setMessage(
+        "Kandidat hanya dapat dihapus saat status DRAFT."
+      );
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Yakin ingin menghapus Kandidat ${candidate.candidate_number}?\n\n` +
+          `Nama: ${candidate.name}\n\n` +
+          "Data kandidat dan foto kandidat akan dihapus.\n\n" +
+          "Tindakan ini tidak dapat dibatalkan."
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCandidateLoading(true);
+    setMessage("");
+
+    try {
       const response =
         await fetch(
           "/api/candidates",
           {
-            method: "POST",
-            body: formData,
+            method: "DELETE",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              candidateId:
+                candidate.id,
+            }),
           }
         );
 
@@ -573,36 +791,19 @@ export default function AdminDashboard({
       if (!response.ok) {
         throw new Error(
           data.message ||
-            "Gagal menambahkan kandidat."
+            "Gagal menghapus kandidat."
         );
       }
 
       setMessage(
-        "Kandidat berhasil ditambahkan."
+        "Kandidat berhasil dihapus."
       );
-
-      setShowCandidateForm(
-        false
-      );
-
-      setCandidateNumber("");
-      setCandidateName("");
-      setCandidateClass("");
-      setCandidateProgram("");
-      setCandidatePhoto(null);
-
-      if (
-        candidatePhotoRef.current
-      ) {
-        candidatePhotoRef.current.value =
-          "";
-      }
 
       await loadCandidates();
     } catch (error) {
       setMessage(
         error.message ||
-          "Terjadi kesalahan saat menyimpan kandidat."
+          "Terjadi kesalahan saat menghapus kandidat."
       );
     } finally {
       setCandidateLoading(
@@ -945,15 +1146,108 @@ export default function AdminDashboard({
           )}
 
           {/* ============================================
-              FORM TAMBAH KANDIDAT
+              FORM TAMBAH / EDIT
           ============================================ */}
 
           {showCandidateForm && (
             <div className="candidate-form">
 
               <h3>
-                Tambah Kandidat
+                {editingCandidate
+                  ? "Edit Kandidat"
+                  : "Tambah Kandidat"}
               </h3>
+
+              {/* PREVIEW FOTO */}
+
+              <div className="candidate-photo-preview-area">
+
+                {candidatePhotoPreview ? (
+                  <img
+                    src={
+                      candidatePhotoPreview
+                    }
+                    alt="Preview kandidat"
+                    className="candidate-photo-preview"
+                  />
+                ) : (
+                  <div className="candidate-photo-placeholder">
+                    Preview Foto
+                  </div>
+                )}
+
+              </div>
+
+              <label>
+                Foto Kandidat
+              </label>
+
+              <input
+                ref={
+                  candidatePhotoRef
+                }
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={
+                  handlePhotoChange
+                }
+              />
+
+              <small>
+                JPG, PNG, atau WEBP.
+                Maksimal 5 MB.
+                Foto akan ditampilkan
+                dengan standar rasio
+                3:4.
+              </small>
+
+              {editingCandidate &&
+                editingCandidate.photo_url && (
+                  <label className="photo-remove-option">
+
+                    <input
+                      type="checkbox"
+                      checked={
+                        removeExistingPhoto
+                      }
+                      onChange={(
+                        event
+                      ) => {
+                        setRemoveExistingPhoto(
+                          event.target
+                            .checked
+                        );
+
+                        if (
+                          event.target
+                            .checked
+                        ) {
+                          setCandidatePhoto(
+                            null
+                          );
+
+                          setCandidatePhotoPreview(
+                            null
+                          );
+
+                          if (
+                            candidatePhotoRef.current
+                          ) {
+                            candidatePhotoRef.current.value =
+                              "";
+                          }
+                        } else {
+                          setCandidatePhotoPreview(
+                            editingCandidate.photo_url
+                          );
+                        }
+                      }}
+                    />
+
+                    Hapus foto lama
+
+                  </label>
+                )}
 
               <label>
                 Nomor Kandidat
@@ -1017,33 +1311,6 @@ export default function AdminDashboard({
               />
 
               <label>
-                Foto Kandidat
-              </label>
-
-              <input
-                ref={
-                  candidatePhotoRef
-                }
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(
-                  event
-                ) => {
-                  setCandidatePhoto(
-                    event.target
-                      .files?.[0] ||
-                      null
-                  );
-                }}
-              />
-
-              <small>
-                JPG, PNG, atau
-                WEBP. Maksimal
-                5 MB.
-              </small>
-
-              <label>
                 Program Unggulan
               </label>
 
@@ -1068,7 +1335,7 @@ export default function AdminDashboard({
                 <button
                   type="button"
                   onClick={
-                    addCandidate
+                    saveCandidate
                   }
                   disabled={
                     candidateLoading
@@ -1076,6 +1343,8 @@ export default function AdminDashboard({
                 >
                   {candidateLoading
                     ? "Menyimpan..."
+                    : editingCandidate
+                    ? "💾 Simpan Perubahan"
                     : "💾 Simpan Kandidat"}
                 </button>
 
@@ -1097,14 +1366,13 @@ export default function AdminDashboard({
           )}
 
           {/* ============================================
-              LOADING KANDIDAT
+              LOADING
           ============================================ */}
 
           {candidateLoading &&
             !showCandidateForm && (
               <p className="subtitle">
-                Memuat data
-                kandidat...
+                Memuat data kandidat...
               </p>
             )}
 
@@ -1178,16 +1446,47 @@ export default function AdminDashboard({
                         }
                       </p>
 
+                      {status ===
+                        "draft" && (
+                        <div className="candidate-actions">
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openEditCandidate(
+                                candidate
+                              )
+                            }
+                            disabled={
+                              candidateLoading
+                            }
+                          >
+                            ✏️ Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteCandidate(
+                                candidate
+                              )
+                            }
+                            disabled={
+                              candidateLoading
+                            }
+                          >
+                            🗑️ Hapus
+                          </button>
+
+                        </div>
+                      )}
+
                     </div>
                   )
                 )}
 
               </div>
             )}
-
-          {/* ============================================
-              BELUM ADA KANDIDAT
-          ============================================ */}
 
           {!candidateLoading &&
             candidates.length ===
