@@ -41,6 +41,10 @@ async function createSupabaseServerClient() {
 }
 
 export default async function AdminPage() {
+  // ----------------------------------------------------
+  // Cek login admin
+  // ----------------------------------------------------
+
   const supabaseAuth =
     await createSupabaseServerClient();
 
@@ -48,16 +52,12 @@ export default async function AdminPage() {
     data: { user },
   } = await supabaseAuth.auth.getUser();
 
-  // ----------------------------------------------------
-  // Pastikan sudah login
-  // ----------------------------------------------------
-
   if (!user) {
     redirect("/admin/login");
   }
 
   // ----------------------------------------------------
-  // Untuk sementara hanya admin utama
+  // Batasi hanya admin utama
   // ----------------------------------------------------
 
   if (user.email !== "admin@nebula.or.id") {
@@ -65,7 +65,7 @@ export default async function AdminPage() {
   }
 
   // ----------------------------------------------------
-  // Client server menggunakan SECRET KEY
+  // Supabase server client dengan secret key
   // ----------------------------------------------------
 
   const supabaseAdmin = createClient(
@@ -83,22 +83,28 @@ export default async function AdminPage() {
   // Ambil election
   // ----------------------------------------------------
 
+  const electionName =
+    "Pemilihan Ketua KIR Nebula Periode 2026/2027";
+
   const {
     data: election,
     error: electionError,
-  } = await supabaseAdmin
-    .from("elections")
-    .select(
-      "id, name, description, status, opened_at, closed_at"
-    )
-    .eq(
-      "name",
-      "Pemilihan Ketua KIR Nebula Periode 2026/2027"
-    )
-    .limit(1)
-    .single();
+  } =
+    await supabaseAdmin
+      .from("elections")
+      .select(
+        "id, name, description, status, opened_at, closed_at"
+      )
+      .eq("name", electionName)
+      .limit(1)
+      .single();
 
   if (electionError || !election) {
+    console.error(
+      "Election error:",
+      electionError
+    );
+
     return (
       <main className="page">
         <section className="card">
@@ -124,7 +130,7 @@ export default async function AdminPage() {
 
   const {
     count: totalVoters,
-    error: voterError,
+    error: totalVotersError,
   } = await supabaseAdmin
     .from("voters")
     .select("id", {
@@ -135,7 +141,7 @@ export default async function AdminPage() {
 
   const {
     count: votedVoters,
-    error: votedError,
+    error: votedVotersError,
   } = await supabaseAdmin
     .from("voters")
     .select("id", {
@@ -145,25 +151,36 @@ export default async function AdminPage() {
     .eq("election_id", election.id)
     .eq("has_voted", true);
 
+  if (
+    totalVotersError ||
+    votedVotersError
+  ) {
+    console.error(
+      "Voter statistics error:",
+      totalVotersError ||
+        votedVotersError
+    );
+  }
+
   // ----------------------------------------------------
-  // Statistik ballot
+  // Statistik ballot melalui RPC
   // ----------------------------------------------------
 
   const {
-    count: totalBallots,
-    error: ballotError,
-  } = await supabaseAdmin
-    .from("ballots")
-    .select("id", {
-      count: "exact",
-      head: true,
-    })
-    .eq("election_id", election.id);
+    data: ballotCountData,
+    error: ballotCountError,
+  } =
+    await supabaseAdmin.rpc(
+      "get_ballot_count",
+      {
+        p_election_id: election.id,
+      }
+    );
 
-  if (voterError || votedError || ballotError) {
+  if (ballotCountError) {
     console.error(
-      "Admin statistics error:",
-      voterError || votedError || ballotError
+      "Ballot count error:",
+      ballotCountError
     );
   }
 
@@ -178,7 +195,7 @@ export default async function AdminPage() {
     votedVoters ?? 0;
 
   const ballots =
-    totalBallots ?? 0;
+    Number(ballotCountData ?? 0);
 
   const notVoted =
     Math.max(total - voted, 0);
@@ -189,7 +206,7 @@ export default async function AdminPage() {
       : "0.00";
 
   // ----------------------------------------------------
-  // Render dashboard
+  // Dashboard
   // ----------------------------------------------------
 
   return (
