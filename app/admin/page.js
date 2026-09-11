@@ -20,7 +20,11 @@ async function createSupabaseServerClient() {
           try {
             cookiesToSet.forEach(
               ({ name, value, options }) => {
-                cookieStore.set(name, value, options);
+                cookieStore.set(
+                  name,
+                  value,
+                  options
+                );
               }
             );
           } catch {
@@ -41,11 +45,18 @@ export default async function AdminPage() {
     data: { user },
   } = await supabaseAuth.auth.getUser();
 
+  // ----------------------------------------------------
+  // Pastikan sudah login
+  // ----------------------------------------------------
+
   if (!user) {
     redirect("/admin/login");
   }
 
+  // ----------------------------------------------------
   // Untuk sementara hanya admin utama
+  // ----------------------------------------------------
+
   if (user.email !== "admin@nebula.or.id") {
     redirect("/");
   }
@@ -70,18 +81,20 @@ export default async function AdminPage() {
   // Ambil election
   // ----------------------------------------------------
 
-  const { data: election, error: electionError } =
-    await supabaseAdmin
-      .from("elections")
-      .select(
-        "id, name, description, status, opened_at, closed_at"
-      )
-      .eq(
-        "name",
-        "Pemilihan Ketua KIR Nebula Periode 2026/2027"
-      )
-      .limit(1)
-      .single();
+  const {
+    data: election,
+    error: electionError,
+  } = await supabaseAdmin
+    .from("elections")
+    .select(
+      "id, name, description, status, opened_at, closed_at"
+    )
+    .eq(
+      "name",
+      "Pemilihan Ketua KIR Nebula Periode 2026/2027"
+    )
+    .limit(1)
+    .single();
 
   if (electionError || !election) {
     return (
@@ -107,14 +120,16 @@ export default async function AdminPage() {
   // Statistik pemilih
   // ----------------------------------------------------
 
-  const { count: totalVoters, error: voterError } =
-    await supabaseAdmin
-      .from("voters")
-      .select("id", {
-        count: "exact",
-        head: true,
-      })
-      .eq("election_id", election.id);
+  const {
+    count: totalVoters,
+    error: voterError,
+  } = await supabaseAdmin
+    .from("voters")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("election_id", election.id);
 
   const {
     count: votedVoters,
@@ -136,10 +151,10 @@ export default async function AdminPage() {
   }
 
   const total =
-    totalVoters || 0;
+    totalVoters ?? 0;
 
   const voted =
-    votedVoters || 0;
+    votedVoters ?? 0;
 
   const notVoted =
     Math.max(total - voted, 0);
@@ -171,31 +186,19 @@ export default async function AdminPage() {
     );
   }
 
+  // ----------------------------------------------------
+  // Kirim data ke AdminDashboard
+  // ----------------------------------------------------
+
   return (
-    <main className="page">
-      <section className="card">
-
-        <div className="badge">
-          NEBULA E-VOTING
-        </div>
-
-        <h1>Admin Dashboard</h1>
-
-        <p className="subtitle">
-          Panel administrasi pemilihan
-        </p>
-
-        <AdminDashboard
-          initialStatus={election.status}
-          electionName={election.name}
-          totalVoters={total}
-          votedVoters={voted}
-          notVotedVoters={notVoted}
-          participation={participation}
-          totalBallots={totalBallots || 0}
-        />
-
-      </section>
-    </main>
+    <AdminDashboard
+      initialStatus={election.status}
+      electionName={election.name}
+      totalVoters={total}
+      votedVoters={voted}
+      notVotedVoters={notVoted}
+      participation={participation}
+      totalBallots={totalBallots ?? 0}
+    />
   );
 }
