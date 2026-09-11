@@ -7,6 +7,9 @@ import crypto from "crypto";
 const ELECTION_NAME =
   "Pemilihan Ketua KIR Nebula Periode 2026/2027";
 
+const BUCKET_NAME =
+  "candidate-photos";
+
 async function getAdminUser() {
   const cookieStore = await cookies();
 
@@ -31,8 +34,7 @@ async function getAdminUser() {
               }
             );
           } catch {
-            // Tidak selalu dapat menulis cookie
-            // dari Server Component / Route Handler.
+            // Tidak masalah jika cookie tidak dapat ditulis.
           }
         },
       },
@@ -85,30 +87,181 @@ async function getElection(supabase) {
 }
 
 function getExtension(fileName) {
-  const parts = fileName.split(".");
-  return parts.length > 1
-    ? parts.pop().toLowerCase()
-    : "";
+  const parts =
+    String(fileName || "").split(".");
+
+  if (parts.length < 2) {
+    return "jpg";
+  }
+
+  return parts
+    .pop()
+    .toLowerCase();
 }
 
 function makePhotoPath(originalName) {
   const extension =
-    getExtension(originalName) || "jpg";
+    getExtension(originalName);
 
   const uniquePart =
-    crypto.randomBytes(12).toString("hex");
+    crypto
+      .randomBytes(12)
+      .toString("hex");
 
   return `candidate-${uniquePart}.${extension}`;
 }
 
+function getStoragePathFromUrl(url) {
+  if (!url) {
+    return null;
+  }
+
+  const marker =
+    `/storage/v1/object/public/${BUCKET_NAME}/`;
+
+  const index =
+    url.indexOf(marker);
+
+  if (index === -1) {
+    return null;
+  }
+
+  return decodeURIComponent(
+    url.substring(
+      index + marker.length
+    )
+  );
+}
+
+async function uploadPhoto(
+  supabase,
+  photo
+) {
+  if (
+    !photo ||
+    typeof photo !== "object" ||
+    typeof photo.arrayBuffer !==
+      "function"
+  ) {
+    return {
+      photoUrl: null,
+      photoPath: null,
+    };
+  }
+
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
+
+  if (
+    !allowedTypes.includes(
+      photo.type
+    )
+  ) {
+    throw new Error(
+      "Foto harus berupa JPG, PNG, atau WEBP."
+    );
+  }
+
+  if (
+    photo.size >
+    5 * 1024 * 1024
+  ) {
+    throw new Error(
+      "Ukuran foto maksimal 5 MB."
+    );
+  }
+
+  const photoPath =
+    makePhotoPath(
+      photo.name || "photo.jpg"
+    );
+
+  const arrayBuffer =
+    await photo.arrayBuffer();
+
+  const buffer =
+    Buffer.from(arrayBuffer);
+
+  const { error } =
+    await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(
+        photoPath,
+        buffer,
+        {
+          contentType:
+            photo.type,
+          upsert: false,
+        }
+      );
+
+  if (error) {
+    console.error(
+      "Photo upload error:",
+      error
+    );
+
+    throw new Error(
+      "Gagal mengunggah foto kandidat."
+    );
+  }
+
+  const {
+    data: publicUrlData,
+  } =
+    supabase.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(
+        photoPath
+      );
+
+  return {
+    photoUrl:
+      publicUrlData?.publicUrl ||
+      null,
+    photoPath,
+  };
+}
+
+async function deletePhoto(
+  supabase,
+  photoUrl
+) {
+  const photoPath =
+    getStoragePathFromUrl(
+      photoUrl
+    );
+
+  if (!photoPath) {
+    return;
+  }
+
+  const { error } =
+    await supabase.storage
+      .from(BUCKET_NAME)
+      .remove([
+        photoPath,
+      ]);
+
+  if (error) {
+    console.error(
+      "Photo delete warning:",
+      error
+    );
+  }
+}
+
 // ======================================================
 // GET
-// Ambil daftar kandidat
 // ======================================================
 
 export async function GET() {
   try {
-    const admin = await getAdminUser();
+    const admin =
+      await getAdminUser();
 
     if (!admin) {
       return NextResponse.json(
@@ -121,24 +274,33 @@ export async function GET() {
       );
     }
 
-    const supabase = createServerSupabase();
+    const supabase =
+      createServerSupabase();
 
-    const election = await getElection(
-      supabase
-    );
+    const election =
+      await getElection(
+        supabase
+      );
 
     const {
       data: candidates,
       error,
-    } = await supabase
-      .from("candidates")
-      .select(
-        "id, candidate_number, name, class_name, vision, photo_url"
-      )
-      .eq("election_id", election.id)
-      .order("candidate_number", {
-        ascending: true,
-      });
+    } =
+      await supabase
+        .from("candidates")
+        .select(
+          "id, candidate_number, name, class_name, vision, photo_url"
+        )
+        .eq(
+          "election_id",
+          election.id
+        )
+        .order(
+          "candidate_number",
+          {
+            ascending: true,
+          }
+        );
 
     if (error) {
       return NextResponse.json(
@@ -158,7 +320,8 @@ export async function GET() {
         name: election.name,
         status: election.status,
       },
-      candidates: candidates || [],
+      candidates:
+        candidates || [],
     });
   } catch (error) {
     console.error(
@@ -180,12 +343,14 @@ export async function GET() {
 
 // ======================================================
 // POST
-// Tambah kandidat
 // ======================================================
 
-export async function POST(request) {
+export async function POST(
+  request
+) {
   try {
-    const admin = await getAdminUser();
+    const admin =
+      await getAdminUser();
 
     if (!admin) {
       return NextResponse.json(
@@ -198,19 +363,23 @@ export async function POST(request) {
       );
     }
 
-    const supabase = createServerSupabase();
+    const supabase =
+      createServerSupabase();
 
-    const election = await getElection(
-      supabase
-    );
+    const election =
+      await getElection(
+        supabase
+      );
 
-    // Hanya boleh saat DRAFT
-    if (election.status !== "draft") {
+    if (
+      election.status !==
+      "draft"
+    ) {
       return NextResponse.json(
         {
           success: false,
           message:
-            "Kandidat hanya dapat dikelola saat status pemilihan DRAFT.",
+            "Kandidat hanya dapat dikelola saat status DRAFT.",
         },
         { status: 400 }
       );
@@ -219,40 +388,36 @@ export async function POST(request) {
     const formData =
       await request.formData();
 
-    const candidateNumberRaw =
-      formData.get("candidateNumber");
+    const candidateNumber =
+      Number(
+        formData.get(
+          "candidateNumber"
+        )
+      );
 
-    const nameRaw =
-      formData.get("name");
+    const name =
+      String(
+        formData.get(
+          "name"
+        ) || ""
+      ).trim();
 
-    const classNameRaw =
-      formData.get("className");
+    const className =
+      String(
+        formData.get(
+          "className"
+        ) || ""
+      ).trim();
 
-    const programRaw =
-      formData.get("program");
+    const program =
+      String(
+        formData.get(
+          "program"
+        ) || ""
+      ).trim();
 
     const photo =
       formData.get("photo");
-
-    const candidateNumber = Number(
-      candidateNumberRaw
-    );
-
-    const name = String(
-      nameRaw || ""
-    ).trim();
-
-    const className = String(
-      classNameRaw || ""
-    ).trim();
-
-    const program = String(
-      programRaw || ""
-    ).trim();
-
-    // -----------------------------------------------
-    // Validasi
-    // -----------------------------------------------
 
     if (
       !Number.isInteger(
@@ -303,24 +468,21 @@ export async function POST(request) {
       );
     }
 
-    // -----------------------------------------------
-    // Cek nomor kandidat sudah dipakai
-    // -----------------------------------------------
-
     const {
       data: existingNumber,
-    } = await supabase
-      .from("candidates")
-      .select("id")
-      .eq(
-        "election_id",
-        election.id
-      )
-      .eq(
-        "candidate_number",
-        candidateNumber
-      )
-      .maybeSingle();
+    } =
+      await supabase
+        .from("candidates")
+        .select("id")
+        .eq(
+          "election_id",
+          election.id
+        )
+        .eq(
+          "candidate_number",
+          candidateNumber
+        )
+        .maybeSingle();
 
     if (existingNumber) {
       return NextResponse.json(
@@ -333,139 +495,60 @@ export async function POST(request) {
       );
     }
 
-    // -----------------------------------------------
-    // Upload foto jika ada
-    // -----------------------------------------------
+    let photoUrl =
+      null;
 
-    let photoUrl = null;
-    let uploadedPhotoPath = null;
+    let uploadedPhotoPath =
+      null;
 
     if (
       photo &&
-      typeof photo === "object" &&
+      typeof photo ===
+        "object" &&
       typeof photo.arrayBuffer ===
         "function"
     ) {
-      const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-      ];
-
-      if (
-        !allowedTypes.includes(
-          photo.type
-        )
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Foto harus berupa JPG, PNG, atau WEBP.",
-          },
-          { status: 400 }
-        );
-      }
-
-      // Maksimum 5 MB
-      if (photo.size > 5 * 1024 * 1024) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Ukuran foto maksimal 5 MB.",
-          },
-          { status: 400 }
-        );
-      }
-
-      uploadedPhotoPath =
-        makePhotoPath(
-          photo.name || "photo.jpg"
-        );
-
-      const arrayBuffer =
-        await photo.arrayBuffer();
-
-      const photoBuffer =
-        Buffer.from(arrayBuffer);
-
-      const {
-        error: uploadError,
-      } = await supabase.storage
-        .from("candidate-photos")
-        .upload(
-          uploadedPhotoPath,
-          photoBuffer,
-          {
-            contentType:
-              photo.type,
-            upsert: false,
-          }
-        );
-
-      if (uploadError) {
-        console.error(
-          "Candidate photo upload error:",
-          uploadError
-        );
-
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Gagal mengunggah foto kandidat.",
-          },
-          { status: 500 }
-        );
-      }
-
-      const {
-        data: publicUrlData,
-      } = supabase.storage
-        .from("candidate-photos")
-        .getPublicUrl(
-          uploadedPhotoPath
+      const uploaded =
+        await uploadPhoto(
+          supabase,
+          photo
         );
 
       photoUrl =
-        publicUrlData?.publicUrl ||
-        null;
-    }
+        uploaded.photoUrl;
 
-    // -----------------------------------------------
-    // Simpan kandidat
-    //
-    // vision dipakai sebagai tempat menyimpan
-    // Program Unggulan sementara agar kita tidak
-    // mengubah struktur database yang sudah stabil.
-    // -----------------------------------------------
+      uploadedPhotoPath =
+        uploaded.photoPath;
+    }
 
     const {
       data: candidate,
       error: insertError,
-    } = await supabase
-      .from("candidates")
-      .insert({
-        election_id: election.id,
-        candidate_number:
-          candidateNumber,
-        name,
-        class_name: className,
-        vision: program,
-        photo_url: photoUrl,
-      })
-      .select(
-        "id, candidate_number, name, class_name, vision, photo_url"
-      )
-      .single();
+    } =
+      await supabase
+        .from("candidates")
+        .insert({
+          election_id:
+            election.id,
+          candidate_number:
+            candidateNumber,
+          name,
+          class_name:
+            className,
+          vision:
+            program,
+          photo_url:
+            photoUrl,
+        })
+        .select(
+          "id, candidate_number, name, class_name, vision, photo_url"
+        )
+        .single();
 
     if (insertError) {
-      // Jika insert gagal setelah upload,
-      // bersihkan foto yang sudah terlanjur diupload.
       if (uploadedPhotoPath) {
         await supabase.storage
-          .from("candidate-photos")
+          .from(BUCKET_NAME)
           .remove([
             uploadedPhotoPath,
           ]);
@@ -487,14 +570,11 @@ export async function POST(request) {
       );
     }
 
-    // -----------------------------------------------
-    // Audit log
-    // -----------------------------------------------
-
     await supabase
       .from("audit_logs")
       .insert({
-        election_id: election.id,
+        election_id:
+          election.id,
         event_type:
           "candidate_created",
         metadata: {
@@ -526,6 +606,552 @@ export async function POST(request) {
         message:
           error.message ||
           "Terjadi kesalahan saat menambahkan kandidat.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// ======================================================
+// PUT
+// Edit kandidat
+// ======================================================
+
+export async function PUT(
+  request
+) {
+  try {
+    const admin =
+      await getAdminUser();
+
+    if (!admin) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Anda harus login sebagai admin.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const supabase =
+      createServerSupabase();
+
+    const election =
+      await getElection(
+        supabase
+      );
+
+    if (
+      election.status !==
+      "draft"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Kandidat hanya dapat diedit saat status DRAFT.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const formData =
+      await request.formData();
+
+    const candidateId =
+      String(
+        formData.get(
+          "candidateId"
+        ) || ""
+      ).trim();
+
+    const candidateNumber =
+      Number(
+        formData.get(
+          "candidateNumber"
+        )
+      );
+
+    const name =
+      String(
+        formData.get(
+          "name"
+        ) || ""
+      ).trim();
+
+    const className =
+      String(
+        formData.get(
+          "className"
+        ) || ""
+      ).trim();
+
+    const program =
+      String(
+        formData.get(
+          "program"
+        ) || ""
+      ).trim();
+
+    const photo =
+      formData.get("photo");
+
+    const removePhoto =
+      String(
+        formData.get(
+          "removePhoto"
+        ) || "false"
+      ) === "true";
+
+    if (!candidateId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "ID kandidat tidak ditemukan.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !Number.isInteger(
+        candidateNumber
+      ) ||
+      candidateNumber < 1
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Nomor kandidat tidak valid.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!name) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Nama kandidat wajib diisi.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!className) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Kelas kandidat wajib diisi.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!program) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Program unggulan wajib diisi.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Ambil kandidat lama
+    const {
+      data: existingCandidate,
+      error:
+        existingCandidateError,
+    } =
+      await supabase
+        .from("candidates")
+        .select(
+          "id, candidate_number, name, class_name, vision, photo_url"
+        )
+        .eq(
+          "id",
+          candidateId
+        )
+        .eq(
+          "election_id",
+          election.id
+        )
+        .single();
+
+    if (
+      existingCandidateError ||
+      !existingCandidate
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Kandidat tidak ditemukan.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Cek nomor kandidat
+    const {
+      data: numberConflict,
+    } =
+      await supabase
+        .from("candidates")
+        .select("id")
+        .eq(
+          "election_id",
+          election.id
+        )
+        .eq(
+          "candidate_number",
+          candidateNumber
+        )
+        .neq(
+          "id",
+          candidateId
+        )
+        .maybeSingle();
+
+    if (numberConflict) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            `Nomor kandidat ${candidateNumber} sudah digunakan kandidat lain.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    let newPhotoUrl =
+      existingCandidate.photo_url;
+
+    let uploadedPhotoPath =
+      null;
+
+    // Kalau pilih foto baru
+    if (
+      photo &&
+      typeof photo ===
+        "object" &&
+      typeof photo.arrayBuffer ===
+        "function"
+    ) {
+      const uploaded =
+        await uploadPhoto(
+          supabase,
+          photo
+        );
+
+      newPhotoUrl =
+        uploaded.photoUrl;
+
+      uploadedPhotoPath =
+        uploaded.photoPath;
+
+      // Hapus foto lama
+      if (
+        existingCandidate.photo_url
+      ) {
+        await deletePhoto(
+          supabase,
+          existingCandidate.photo_url
+        );
+      }
+    }
+
+    // Kalau admin memilih hapus foto
+    else if (
+      removePhoto &&
+      existingCandidate.photo_url
+    ) {
+      await deletePhoto(
+        supabase,
+        existingCandidate.photo_url
+      );
+
+      newPhotoUrl =
+        null;
+    }
+
+    const {
+      data: updatedCandidate,
+      error: updateError,
+    } =
+      await supabase
+        .from("candidates")
+        .update({
+          candidate_number:
+            candidateNumber,
+          name,
+          class_name:
+            className,
+          vision:
+            program,
+          photo_url:
+            newPhotoUrl,
+        })
+        .eq(
+          "id",
+          candidateId
+        )
+        .eq(
+          "election_id",
+          election.id
+        )
+        .select(
+          "id, candidate_number, name, class_name, vision, photo_url"
+        )
+        .single();
+
+    if (updateError) {
+      if (uploadedPhotoPath) {
+        await supabase.storage
+          .from(BUCKET_NAME)
+          .remove([
+            uploadedPhotoPath,
+          ]);
+      }
+
+      console.error(
+        "Update candidate error:",
+        updateError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Gagal memperbarui kandidat: " +
+            updateError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    await supabase
+      .from("audit_logs")
+      .insert({
+        election_id:
+          election.id,
+        event_type:
+          "candidate_updated",
+        metadata: {
+          candidate_id:
+            updatedCandidate.id,
+          candidate_number:
+            updatedCandidate.candidate_number,
+        },
+      });
+
+    return NextResponse.json({
+      success: true,
+      message:
+        "Kandidat berhasil diperbarui.",
+      candidate:
+        updatedCandidate,
+    });
+  } catch (error) {
+    console.error(
+      "PUT candidate error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error.message ||
+          "Terjadi kesalahan saat memperbarui kandidat.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// ======================================================
+// DELETE
+// Hapus kandidat
+// ======================================================
+
+export async function DELETE(
+  request
+) {
+  try {
+    const admin =
+      await getAdminUser();
+
+    if (!admin) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Anda harus login sebagai admin.",
+        },
+        { status: 401 }
+      );
+    }
+
+    const supabase =
+      createServerSupabase();
+
+    const election =
+      await getElection(
+        supabase
+      );
+
+    if (
+      election.status !==
+      "draft"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Kandidat hanya dapat dihapus saat status DRAFT.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const body =
+      await request.json();
+
+    const candidateId =
+      String(
+        body?.candidateId ||
+          ""
+      ).trim();
+
+    if (!candidateId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "ID kandidat tidak ditemukan.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const {
+      data: candidate,
+      error:
+        candidateError,
+    } =
+      await supabase
+        .from("candidates")
+        .select(
+          "id, candidate_number, name, photo_url"
+        )
+        .eq(
+          "id",
+          candidateId
+        )
+        .eq(
+          "election_id",
+          election.id
+        )
+        .single();
+
+    if (
+      candidateError ||
+      !candidate
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Kandidat tidak ditemukan.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Hapus data kandidat
+    const {
+      error: deleteError,
+    } =
+      await supabase
+        .from("candidates")
+        .delete()
+        .eq(
+          "id",
+          candidateId
+        )
+        .eq(
+          "election_id",
+          election.id
+        );
+
+    if (deleteError) {
+      console.error(
+        "Delete candidate error:",
+        deleteError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Gagal menghapus kandidat: " +
+            deleteError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Hapus foto jika ada
+    if (candidate.photo_url) {
+      await deletePhoto(
+        supabase,
+        candidate.photo_url
+      );
+    }
+
+    await supabase
+      .from("audit_logs")
+      .insert({
+        election_id:
+          election.id,
+        event_type:
+          "candidate_deleted",
+        metadata: {
+          candidate_id:
+            candidate.id,
+          candidate_number:
+            candidate.candidate_number,
+          candidate_name:
+            candidate.name,
+        },
+      });
+
+    return NextResponse.json({
+      success: true,
+      message:
+        "Kandidat berhasil dihapus.",
+    });
+  } catch (error) {
+    console.error(
+      "DELETE candidate error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error.message ||
+          "Terjadi kesalahan saat menghapus kandidat.",
       },
       { status: 500 }
     );
