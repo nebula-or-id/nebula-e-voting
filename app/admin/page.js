@@ -4,6 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import AdminDashboard from "./AdminDashboard";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function createSupabaseServerClient() {
   const cookieStore = await cookies();
 
@@ -63,7 +66,6 @@ export default async function AdminPage() {
 
   // ----------------------------------------------------
   // Client server menggunakan SECRET KEY
-  // Dipakai hanya di server untuk statistik admin.
   // ----------------------------------------------------
 
   const supabaseAdmin = createClient(
@@ -143,29 +145,8 @@ export default async function AdminPage() {
     .eq("election_id", election.id)
     .eq("has_voted", true);
 
-  if (voterError || votedError) {
-    console.error(
-      "Voter statistics error:",
-      voterError || votedError
-    );
-  }
-
-  const total =
-    totalVoters ?? 0;
-
-  const voted =
-    votedVoters ?? 0;
-
-  const notVoted =
-    Math.max(total - voted, 0);
-
-  const participation =
-    total > 0
-      ? ((voted / total) * 100).toFixed(2)
-      : "0.00";
-
   // ----------------------------------------------------
-  // Jumlah ballot
+  // Statistik ballot
   // ----------------------------------------------------
 
   const {
@@ -179,15 +160,36 @@ export default async function AdminPage() {
     })
     .eq("election_id", election.id);
 
-  if (ballotError) {
+  if (voterError || votedError || ballotError) {
     console.error(
-      "Ballot statistics error:",
-      ballotError
+      "Admin statistics error:",
+      voterError || votedError || ballotError
     );
   }
 
   // ----------------------------------------------------
-  // Kirim data ke AdminDashboard
+  // Normalisasi angka
+  // ----------------------------------------------------
+
+  const total =
+    totalVoters ?? 0;
+
+  const voted =
+    votedVoters ?? 0;
+
+  const ballots =
+    totalBallots ?? 0;
+
+  const notVoted =
+    Math.max(total - voted, 0);
+
+  const participation =
+    total > 0
+      ? ((voted / total) * 100).toFixed(2)
+      : "0.00";
+
+  // ----------------------------------------------------
+  // Render dashboard
   // ----------------------------------------------------
 
   return (
@@ -198,7 +200,7 @@ export default async function AdminPage() {
       votedVoters={voted}
       notVotedVoters={notVoted}
       participation={participation}
-      totalBallots={totalBallots ?? 0}
+      totalBallots={ballots}
     />
   );
 }
