@@ -1,30 +1,53 @@
-export default function Home() {
+import { supabase } from "../lib/supabase";
+
+export default async function Home() {
+  const { data, error } = await supabase
+    .from("elections")
+    .select("name, description, status")
+    .limit(1)
+    .single();
+
+  if (error) {
+    return (
+      <main className="page">
+        <section className="card">
+          <div className="badge">NEBULA E-VOTING</div>
+
+          <h1>Koneksi Database Gagal</h1>
+
+          <p className="subtitle">
+            Aplikasi belum berhasil membaca data dari Supabase.
+          </p>
+
+          <div className="info">
+            <p>
+              <strong>Error:</strong>
+            </p>
+            <p>{error.message}</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="page">
       <section className="card">
         <div className="badge">NEBULA E-VOTING</div>
 
-        <h1>Pemilihan Ketua KIR Nebula</h1>
+        <h1>{data.name}</h1>
 
         <p className="subtitle">
-          Periode 2026/2027
+          Database Supabase berhasil terhubung.
         </p>
 
         <div className="info">
           <p>
-            <strong>1 Pemilih = 1 Suara</strong>
+            <strong>Status Pemilihan:</strong> {data.status}
           </p>
 
-          <p>
-            Pemilihan menggunakan metode Weighted Borda Count.
-          </p>
-
-          <p>
-            Silakan gunakan NISN/ID dan token yang telah diberikan.
-          </p>
+          <p>{data.description}</p>
         </div>
-
-        <button>Mulai Memilih</button>
       </section>
     </main>
   );
