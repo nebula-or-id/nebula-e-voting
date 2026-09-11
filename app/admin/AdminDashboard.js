@@ -21,6 +21,18 @@ export default function AdminDashboard({
     useState("");
 
   async function changeStatus(action) {
+    const confirmMessage =
+      action === "open"
+        ? "Yakin ingin membuka pemilihan? Setelah dibuka, pemilih dapat mulai memberikan suara."
+        : "Yakin ingin menutup pemilihan? Setelah ditutup, pemilih tidak dapat mengirim suara baru.";
+
+    const confirmed =
+      window.confirm(confirmMessage);
+
+    if (!confirmed) {
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
