@@ -1,6 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 export default function AdminDashboard({
   initialStatus,
@@ -11,50 +15,84 @@ export default function AdminDashboard({
   participation,
   totalBallots,
 }) {
-  const [status, setStatus] = useState(initialStatus);
+  // ====================================================
+  // STATE UMUM
+  // ====================================================
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [status, setStatus] =
+    useState(initialStatus);
 
-  // ----------------------------------------------------
-  // Import pemilih
-  // ----------------------------------------------------
+  const [loading, setLoading] =
+    useState(false);
 
-  const [importing, setImporting] = useState(false);
+  const [message, setMessage] =
+    useState("");
+
+  // ====================================================
+  // IMPORT PEMILIH
+  // ====================================================
+
+  const [importing, setImporting] =
+    useState(false);
+
   const [importResult, setImportResult] =
     useState(null);
 
-  const fileInputRef = useRef(null);
+  const fileInputRef =
+    useRef(null);
 
-  // ----------------------------------------------------
-  // Kandidat
-  // ----------------------------------------------------
+  // ====================================================
+  // KANDIDAT
+  // ====================================================
 
   const [candidates, setCandidates] =
     useState([]);
 
-  const [candidateLoading, setCandidateLoading] =
-    useState(false);
+  const [
+    candidateLoading,
+    setCandidateLoading,
+  ] = useState(false);
 
-  const [showCandidateForm, setShowCandidateForm] =
-    useState(false);
+  const [
+    showCandidateForm,
+    setShowCandidateForm,
+  ] = useState(false);
 
-  const [candidateNumber, setCandidateNumber] =
-    useState("");
+  const [
+    candidateNumber,
+    setCandidateNumber,
+  ] = useState("");
 
-  const [candidateName, setCandidateName] =
-    useState("");
+  const [
+    candidateName,
+    setCandidateName,
+  ] = useState("");
 
-  const [candidateClass, setCandidateClass] =
-    useState("");
+  const [
+    candidateClass,
+    setCandidateClass,
+  ] = useState("");
 
-  const [candidateProgram, setCandidateProgram] =
-    useState("");
+  const [
+    candidateProgram,
+    setCandidateProgram,
+  ] = useState("");
 
-  const [candidatePhoto, setCandidatePhoto] =
-    useState(null);
+  const [
+    candidatePhoto,
+    setCandidatePhoto,
+  ] = useState(null);
 
-  const candidatePhotoRef = useRef(null);
+  const candidatePhotoRef =
+    useRef(null);
+
+  // ====================================================
+  // LOAD KANDIDAT OTOMATIS
+  // ====================================================
+
+  useEffect(() => {
+    loadCandidates();
+  }, []);
 
   // ====================================================
   // STATUS PEMILIHAN
@@ -77,18 +115,23 @@ export default function AdminDashboard({
     setMessage("");
 
     try {
-      const response = await fetch(
-        "/api/admin/election-status",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ action }),
-        }
-      );
+      const response =
+        await fetch(
+          "/api/admin/election-status",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              action,
+            }),
+          }
+        );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -140,14 +183,16 @@ export default function AdminDashboard({
     setMessage("");
 
     try {
-      const response = await fetch(
-        "/api/prepare-election",
-        {
-          method: "POST",
-        }
-      );
+      const response =
+        await fetch(
+          "/api/prepare-election",
+          {
+            method: "POST",
+          }
+        );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -234,16 +279,22 @@ export default function AdminDashboard({
 
         if (
           data.errors &&
-          Array.isArray(data.errors)
+          Array.isArray(
+            data.errors
+          )
         ) {
           errorMessage +=
             "\n\n" +
-            data.errors.join("\n");
+            data.errors.join(
+              "\n"
+            );
         }
 
         if (
           data.existing &&
-          Array.isArray(data.existing)
+          Array.isArray(
+            data.existing
+          )
         ) {
           errorMessage +=
             "\n\nNISN yang sudah terdaftar:\n" +
@@ -277,16 +328,25 @@ export default function AdminDashboard({
     }
   }
 
+  // ====================================================
+  // DOWNLOAD TOKEN
+  // ====================================================
+
   function downloadTokens() {
     if (
       !importResult?.voters ||
-      importResult.voters.length === 0
+      importResult.voters.length ===
+        0
     ) {
       return;
     }
 
     const rows = [
-      ["NISN", "Nama", "Token"],
+      [
+        "NISN",
+        "Nama",
+        "Token",
+      ],
       ...importResult.voters.map(
         (voter) => [
           voter.nisn,
@@ -320,7 +380,9 @@ export default function AdminDashboard({
     );
 
     const url =
-      URL.createObjectURL(blob);
+      URL.createObjectURL(
+        blob
+      );
 
     const link =
       document.createElement(
@@ -328,6 +390,7 @@ export default function AdminDashboard({
       );
 
     link.href = url;
+
     link.download =
       "token-pemilih-nebula.csv";
 
@@ -341,21 +404,26 @@ export default function AdminDashboard({
       link
     );
 
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(
+      url
+    );
   }
 
   // ====================================================
-  // AMBIL KANDIDAT
+  // LOAD KANDIDAT
   // ====================================================
 
   async function loadCandidates() {
     setCandidateLoading(true);
-    setMessage("");
 
     try {
       const response =
         await fetch(
-          "/api/candidates"
+          "/api/candidates",
+          {
+            method: "GET",
+            cache: "no-store",
+          }
         );
 
       const data =
@@ -372,12 +440,19 @@ export default function AdminDashboard({
         data.candidates || []
       );
     } catch (error) {
+      console.error(
+        "Load candidates error:",
+        error
+      );
+
       setMessage(
         error.message ||
           "Gagal mengambil kandidat."
       );
     } finally {
-      setCandidateLoading(false);
+      setCandidateLoading(
+        false
+      );
     }
   }
 
@@ -392,17 +467,22 @@ export default function AdminDashboard({
     setCandidateProgram("");
     setCandidatePhoto(null);
 
-    if (candidatePhotoRef.current) {
+    if (
+      candidatePhotoRef.current
+    ) {
       candidatePhotoRef.current.value =
         "";
     }
 
-    setShowCandidateForm(true);
-    loadCandidates();
+    setShowCandidateForm(
+      true
+    );
   }
 
   function closeCandidateForm() {
-    setShowCandidateForm(false);
+    setShowCandidateForm(
+      false
+    );
   }
 
   // ====================================================
@@ -441,7 +521,10 @@ export default function AdminDashboard({
       return;
     }
 
-    setCandidateLoading(true);
+    setCandidateLoading(
+      true
+    );
+
     setMessage("");
 
     try {
@@ -498,7 +581,9 @@ export default function AdminDashboard({
         "Kandidat berhasil ditambahkan."
       );
 
-      setShowCandidateForm(false);
+      setShowCandidateForm(
+        false
+      );
 
       setCandidateNumber("");
       setCandidateName("");
@@ -506,7 +591,9 @@ export default function AdminDashboard({
       setCandidateProgram("");
       setCandidatePhoto(null);
 
-      if (candidatePhotoRef.current) {
+      if (
+        candidatePhotoRef.current
+      ) {
         candidatePhotoRef.current.value =
           "";
       }
@@ -518,68 +605,93 @@ export default function AdminDashboard({
           "Terjadi kesalahan saat menyimpan kandidat."
       );
     } finally {
-      setCandidateLoading(false);
+      setCandidateLoading(
+        false
+      );
     }
   }
+
+  // ====================================================
+  // RENDER
+  // ====================================================
 
   return (
     <main className="page">
       <section className="card">
 
-        {/* ==================================================
+        {/* ==============================================
             HEADER
-        ================================================== */}
+        ============================================== */}
 
         <div className="badge">
           NEBULA E-VOTING
         </div>
 
-        <h1>Admin Dashboard</h1>
+        <h1>
+          Admin Dashboard
+        </h1>
 
         <p className="subtitle">
-          Panel administrasi pemilihan
+          Panel administrasi
+          pemilihan
         </p>
 
         <div className="info">
-          <strong>Pemilihan:</strong>
+          <strong>
+            Pemilihan:
+          </strong>
           <br />
           {electionName}
         </div>
 
         <div className="info">
-          <strong>Status:</strong>{" "}
+          <strong>
+            Status:
+          </strong>{" "}
           {status.toUpperCase()}
         </div>
 
-        {/* ==================================================
+        {/* ==============================================
             STATISTIK
-        ================================================== */}
+        ============================================== */}
 
         <div className="stats">
 
           <div className="stat-card">
-            <span>Total Pemilih</span>
+            <span>
+              Total Pemilih
+            </span>
+
             <strong>
               {totalVoters}
             </strong>
           </div>
 
           <div className="stat-card">
-            <span>Sudah Memilih</span>
+            <span>
+              Sudah Memilih
+            </span>
+
             <strong>
               {votedVoters}
             </strong>
           </div>
 
           <div className="stat-card">
-            <span>Belum Memilih</span>
+            <span>
+              Belum Memilih
+            </span>
+
             <strong>
               {notVotedVoters}
             </strong>
           </div>
 
           <div className="stat-card">
-            <span>Partisipasi</span>
+            <span>
+              Partisipasi
+            </span>
+
             <strong>
               {Number(
                 participation
@@ -589,7 +701,10 @@ export default function AdminDashboard({
           </div>
 
           <div className="stat-card">
-            <span>Total Ballot</span>
+            <span>
+              Total Ballot
+            </span>
+
             <strong>
               {totalBallots}
             </strong>
@@ -597,9 +712,9 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* ==================================================
+        {/* ==============================================
             KONTROL PEMILIHAN
-        ================================================== */}
+        ============================================== */}
 
         <div className="admin-actions">
 
@@ -628,7 +743,9 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() =>
-                changeStatus("open")
+                changeStatus(
+                  "open"
+                )
               }
               disabled={
                 loading ||
@@ -647,7 +764,9 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() =>
-                changeStatus("close")
+                changeStatus(
+                  "close"
+                )
               }
               disabled={
                 loading ||
@@ -677,9 +796,9 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* ==================================================
+        {/* ==============================================
             DATA PEMILIH
-        ================================================== */}
+        ============================================== */}
 
         <div className="admin-actions">
 
@@ -688,8 +807,8 @@ export default function AdminDashboard({
           </h2>
 
           <p className="subtitle">
-            Import data pemilih dari
-            Excel.
+            Import data pemilih
+            dari Excel.
           </p>
 
           <div className="info">
@@ -697,17 +816,21 @@ export default function AdminDashboard({
               Format file:
             </strong>
             <br />
-            NISN | Nama | Kategori
+            NISN | Nama |
+            Kategori
             <br />
             <br />
+
             <strong>
-              Status pemilihan harus
-              DRAFT.
+              Status pemilihan
+              harus DRAFT.
             </strong>
           </div>
 
           <input
-            ref={fileInputRef}
+            ref={
+              fileInputRef
+            }
             type="file"
             accept=".xlsx,.xls,.csv"
             disabled={
@@ -780,9 +903,9 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* ==================================================
+        {/* ==============================================
             DATA KANDIDAT
-        ================================================== */}
+        ============================================== */}
 
         <div className="admin-actions">
 
@@ -791,7 +914,8 @@ export default function AdminDashboard({
           </h2>
 
           <p className="subtitle">
-            Kelola kandidat pemilihan.
+            Kelola kandidat
+            pemilihan.
           </p>
 
           {status ===
@@ -814,10 +938,15 @@ export default function AdminDashboard({
           {status !==
             "draft" && (
             <p className="closed-message">
-              Kandidat dikunci selama
-              pemilihan berlangsung.
+              Kandidat dikunci
+              selama pemilihan
+              berlangsung.
             </p>
           )}
+
+          {/* ============================================
+              FORM TAMBAH KANDIDAT
+          ============================================ */}
 
           {showCandidateForm && (
             <div className="candidate-form">
@@ -836,7 +965,9 @@ export default function AdminDashboard({
                 value={
                   candidateNumber
                 }
-                onChange={(event) =>
+                onChange={(
+                  event
+                ) =>
                   setCandidateNumber(
                     event.target
                       .value
@@ -854,13 +985,15 @@ export default function AdminDashboard({
                 value={
                   candidateName
                 }
-                onChange={(event) =>
+                onChange={(
+                  event
+                ) =>
                   setCandidateName(
                     event.target
                       .value
                   )
                 }
-                placeholder="Nama lengkap"
+                placeholder="Nama lengkap kandidat"
               />
 
               <label>
@@ -872,7 +1005,9 @@ export default function AdminDashboard({
                 value={
                   candidateClass
                 }
-                onChange={(event) =>
+                onChange={(
+                  event
+                ) =>
                   setCandidateClass(
                     event.target
                       .value
@@ -903,8 +1038,9 @@ export default function AdminDashboard({
               />
 
               <small>
-                JPG, PNG, atau WEBP.
-                Maksimal 5 MB.
+                JPG, PNG, atau
+                WEBP. Maksimal
+                5 MB.
               </small>
 
               <label>
@@ -915,7 +1051,9 @@ export default function AdminDashboard({
                 value={
                   candidateProgram
                 }
-                onChange={(event) =>
+                onChange={(
+                  event
+                ) =>
                   setCandidateProgram(
                     event.target
                       .value
@@ -958,96 +1096,115 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ================================================
-              DAFTAR KANDIDAT
-          ================================================ */}
+          {/* ============================================
+              LOADING KANDIDAT
+          ============================================ */}
 
           {candidateLoading &&
             !showCandidateForm && (
               <p className="subtitle">
-                Memuat data kandidat...
+                Memuat data
+                kandidat...
               </p>
             )}
 
-          {candidates.length >
-            0 && (
-            <div className="candidate-list">
+          {/* ============================================
+              DAFTAR KANDIDAT
+          ============================================ */}
 
-              {candidates.map(
-                (candidate) => (
-                  <div
-                    className="candidate-card"
-                    key={
-                      candidate.id
-                    }
-                  >
+          {!candidateLoading &&
+            candidates.length >
+              0 && (
+              <div className="candidate-list">
 
-                    {candidate.photo_url && (
-                      <img
-                        src={
-                          candidate.photo_url
+                {candidates.map(
+                  (
+                    candidate
+                  ) => (
+                    <div
+                      className="candidate-card"
+                      key={
+                        candidate.id
+                      }
+                    >
+
+                      {candidate.photo_url ? (
+                        <img
+                          src={
+                            candidate.photo_url
+                          }
+                          alt={
+                            candidate.name
+                          }
+                          className="candidate-photo"
+                        />
+                      ) : (
+                        <div className="candidate-photo-placeholder">
+                          Belum ada
+                          foto
+                        </div>
+                      )}
+
+                      <div className="candidate-number">
+                        No.{" "}
+                        {
+                          candidate.candidate_number
                         }
-                        alt={
+                      </div>
+
+                      <h3>
+                        {
                           candidate.name
                         }
-                        className="candidate-photo"
-                      />
-                    )}
+                      </h3>
 
-                    <div className="candidate-number">
-                      No.{" "}
-                      {
-                        candidate.candidate_number
-                      }
+                      <p>
+                        <strong>
+                          Kelas:
+                        </strong>{" "}
+                        {
+                          candidate.class_name
+                        }
+                      </p>
+
+                      <p>
+                        <strong>
+                          Program
+                          Unggulan:
+                        </strong>
+                        <br />
+                        {
+                          candidate.vision
+                        }
+                      </p>
+
                     </div>
+                  )
+                )}
 
-                    <h3>
-                      {
-                        candidate.name
-                      }
-                    </h3>
+              </div>
+            )}
 
-                    <p>
-                      <strong>
-                        Kelas:
-                      </strong>{" "}
-                      {
-                        candidate.class_name
-                      }
-                    </p>
+          {/* ============================================
+              BELUM ADA KANDIDAT
+          ============================================ */}
 
-                    <p>
-                      <strong>
-                        Program Unggulan:
-                      </strong>
-                      <br />
-                      {
-                        candidate.vision
-                      }
-                    </p>
-
-                  </div>
-                )
-              )}
-
-            </div>
-          )}
-
-          {candidates.length ===
-            0 &&
-            !candidateLoading &&
+          {!candidateLoading &&
+            candidates.length ===
+              0 &&
             !showCandidateForm && (
               <div className="info">
-                Belum ada data kandidat
-                yang ditampilkan.
+                Belum ada data
+                kandidat yang
+                ditampilkan.
               </div>
             )}
 
         </div>
 
-        {/* ==================================================
+        {/* ==============================================
             PESAN SISTEM
-        ================================================== */}
+        ============================================== */}
 
         {message && (
           <div className="message">
