@@ -6,6 +6,12 @@ import {
   useState,
 } from "react";
 
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+} from "pdf-lib";
+
 export default function AdminDashboard({
   initialStatus,
   electionName,
@@ -326,7 +332,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // DOWNLOAD TOKEN
+  // DOWNLOAD TOKEN CSV
   // ====================================================
 
   function downloadTokens() {
@@ -377,7 +383,9 @@ export default function AdminDashboard({
     );
 
     const url =
-      URL.createObjectURL(blob);
+      URL.createObjectURL(
+        blob
+      );
 
     const link =
       document.createElement(
@@ -385,7 +393,6 @@ export default function AdminDashboard({
       );
 
     link.href = url;
-
     link.download =
       "token-pemilih-nebula.csv";
 
@@ -405,11 +412,477 @@ export default function AdminDashboard({
   }
 
   // ====================================================
+  // DOWNLOAD KARTU PEMILIH A4
+  // ====================================================
+
+  async function downloadVoterCards() {
+    if (
+      !importResult?.voters ||
+      importResult.voters.length ===
+        0
+    ) {
+      setMessage(
+        "Tidak ada data token yang dapat dibuat menjadi kartu."
+      );
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Buat Kartu Pemilih A4?\n\n" +
+          "PDF akan berisi kartu pemilih lengkap dengan NISN dan token.\n\n" +
+          "Setelah PDF selesai dibuat, simpan file tersebut dengan aman."
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setMessage(
+        "Sedang membuat PDF Kartu Pemilih..."
+      );
+
+      const pdfDoc =
+        await PDFDocument.create();
+
+      const fontRegular =
+        await pdfDoc.embedFont(
+          StandardFonts.Helvetica
+        );
+
+      const fontBold =
+        await pdfDoc.embedFont(
+          StandardFonts.HelveticaBold
+        );
+
+      // Ukuran A4 dalam point
+      const pageWidth =
+        595.28;
+
+      const pageHeight =
+        841.89;
+
+      // Layout 2 kolom x 4 baris
+      const columns = 2;
+      const rowsPerPage = 4;
+
+      const margin = 24;
+      const gap = 12;
+
+      const cardWidth =
+        (pageWidth -
+          margin * 2 -
+          gap) /
+        columns;
+
+      const cardHeight =
+        (pageHeight -
+          margin * 2 -
+          gap * 3) /
+        rowsPerPage;
+
+      // Warna sederhana dan ramah printer
+      const dark =
+        rgb(
+          0.09,
+          0.13,
+          0.20
+        );
+
+      const gray =
+        rgb(
+          0.35,
+          0.39,
+          0.45
+        );
+
+      const border =
+        rgb(
+          0.72,
+          0.76,
+          0.82
+        );
+
+      const light =
+        rgb(
+          0.96,
+          0.97,
+          0.98
+        );
+
+      const accent =
+        rgb(
+          0.93,
+          0.95,
+          1
+        );
+
+      importResult.voters.forEach(
+        (voter, index) => {
+          const indexInPage =
+            index %
+            (columns *
+              rowsPerPage);
+
+          if (
+            indexInPage === 0
+          ) {
+            pdfDoc.addPage([
+              pageWidth,
+              pageHeight,
+            ]);
+          }
+
+          const pageCount =
+            pdfDoc.getPageCount();
+
+          const page =
+            pdfDoc.getPage(
+              pageCount - 1
+            );
+
+          const col =
+            indexInPage %
+            columns;
+
+          const row =
+            Math.floor(
+              indexInPage /
+                columns
+            );
+
+          const x =
+            margin +
+            col *
+              (cardWidth +
+                gap);
+
+          const y =
+            pageHeight -
+            margin -
+            (row + 1) *
+              cardHeight -
+            row * gap;
+
+          // Kotak kartu
+          page.drawRectangle({
+            x,
+            y,
+            width:
+              cardWidth,
+            height:
+              cardHeight,
+            borderColor:
+              border,
+            borderWidth: 1,
+          });
+
+          // Header
+          page.drawRectangle({
+            x:
+              x + 8,
+            y:
+              y +
+              cardHeight -
+              43,
+            width:
+              cardWidth -
+              16,
+            height: 31,
+            color:
+              accent,
+          });
+
+          page.drawText(
+            "NEBULA E-VOTING",
+            {
+              x:
+                x + 16,
+              y:
+                y +
+                cardHeight -
+                29,
+              size: 11,
+              font:
+                fontBold,
+              color:
+                dark,
+            }
+          );
+
+          page.drawText(
+            "PEMILIHAN KETUA KIR NEBULA",
+            {
+              x:
+                x + 16,
+              y:
+                y +
+                cardHeight -
+                40,
+              size: 6.5,
+              font:
+                fontRegular,
+              color:
+                gray,
+            }
+          );
+
+          // Label identitas
+          const left =
+            x + 16;
+
+          let textY =
+            y +
+            cardHeight -
+            65;
+
+          page.drawText(
+            "NAMA",
+            {
+              x: left,
+              y: textY,
+              size: 6.5,
+              font:
+                fontBold,
+              color:
+                gray,
+            }
+          );
+
+          textY -= 13;
+
+          page.drawText(
+            String(
+              voter.nama
+            ),
+            {
+              x: left,
+              y: textY,
+              size: 9,
+              font:
+                fontBold,
+              color:
+                dark,
+              maxWidth:
+                cardWidth -
+                32,
+            }
+          );
+
+          textY -= 25;
+
+          page.drawText(
+            "NISN",
+            {
+              x: left,
+              y: textY,
+              size: 6.5,
+              font:
+                fontBold,
+              color:
+                gray,
+            }
+          );
+
+          textY -= 13;
+
+          page.drawText(
+            String(
+              voter.nisn
+            ),
+            {
+              x: left,
+              y: textY,
+              size: 8.5,
+              font:
+                fontRegular,
+              color:
+                dark,
+            }
+          );
+
+          // Area token
+          const tokenBoxHeight =
+            57;
+
+          const tokenBoxY =
+            y + 42;
+
+          page.drawRectangle({
+            x:
+              x + 12,
+            y:
+              tokenBoxY,
+            width:
+              cardWidth -
+              24,
+            height:
+              tokenBoxHeight,
+            color:
+              light,
+            borderColor:
+              border,
+            borderWidth: 0.8,
+          });
+
+          page.drawText(
+            "TOKEN",
+            {
+              x:
+                x + 20,
+              y:
+                tokenBoxY +
+                tokenBoxHeight -
+                16,
+              size: 7,
+              font:
+                fontBold,
+              color:
+                gray,
+            }
+          );
+
+          const token =
+            String(
+              voter.token
+            );
+
+          const tokenSize =
+            token.length > 10
+              ? 15
+              : 17;
+
+          const tokenWidth =
+            fontBold.widthOfTextAtSize(
+              token,
+              tokenSize
+            );
+
+          page.drawText(
+            token,
+            {
+              x:
+                x +
+                (cardWidth -
+                  tokenWidth) /
+                  2,
+              y:
+                tokenBoxY +
+                16,
+              size:
+                tokenSize,
+              font:
+                fontBold,
+              color:
+                dark,
+              characterSpacing:
+                1.5,
+            }
+          );
+
+          // Footer
+          page.drawText(
+            "Gunakan token ini satu kali untuk memberikan suara.",
+            {
+              x:
+                left,
+              y:
+                y + 18,
+              size: 6,
+              font:
+                fontRegular,
+              color:
+                gray,
+            }
+          );
+
+          page.drawText(
+            `Kartu ${index + 1}`,
+            {
+              x:
+                x +
+                cardWidth -
+                48,
+              y:
+                y + 18,
+              size: 5.5,
+              font:
+                fontRegular,
+              color:
+                gray,
+            }
+          );
+        }
+      );
+
+      // Simpan PDF
+      const pdfBytes =
+        await pdfDoc.save();
+
+      const blob =
+        new Blob(
+          [pdfBytes],
+          {
+            type:
+              "application/pdf",
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      link.href = url;
+
+      link.download =
+        "kartu-pemilih-nebula-A4.pdf";
+
+      document.body.appendChild(
+        link
+      );
+
+      link.click();
+
+      document.body.removeChild(
+        link
+      );
+
+      URL.revokeObjectURL(
+        url
+      );
+
+      setMessage(
+        "Kartu Pemilih A4 berhasil dibuat."
+      );
+    } catch (error) {
+      console.error(
+        "PDF generation error:",
+        error
+      );
+
+      setMessage(
+        "Gagal membuat PDF Kartu Pemilih: " +
+          (error.message ||
+            "kesalahan tidak diketahui.")
+      );
+    }
+  }
+
+  // ====================================================
   // LOAD KANDIDAT
   // ====================================================
 
   async function loadCandidates() {
-    setCandidateLoading(true);
+    setCandidateLoading(
+      true
+    );
 
     try {
       const response =
@@ -452,7 +925,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // RESET FORM
+  // RESET FORM KANDIDAT
   // ====================================================
 
   function resetCandidateForm() {
@@ -461,8 +934,12 @@ export default function AdminDashboard({
     setCandidateClass("");
     setCandidateProgram("");
     setCandidatePhoto(null);
-    setCandidatePhotoPreview(null);
-    setRemoveExistingPhoto(false);
+    setCandidatePhotoPreview(
+      null
+    );
+    setRemoveExistingPhoto(
+      false
+    );
 
     if (
       candidatePhotoRef.current
@@ -479,9 +956,13 @@ export default function AdminDashboard({
   function openCandidateForm() {
     resetCandidateForm();
 
-    setEditingCandidate(null);
+    setEditingCandidate(
+      null
+    );
 
-    setShowCandidateForm(true);
+    setShowCandidateForm(
+      true
+    );
 
     setMessage("");
   }
@@ -490,12 +971,9 @@ export default function AdminDashboard({
   // BUKA FORM EDIT
   // ====================================================
 
-  function openEditCandidate(candidate) {
-    console.log(
-      "Edit kandidat:",
-      candidate
-    );
-
+  function openEditCandidate(
+    candidate
+  ) {
     setEditingCandidate(
       candidate
     );
@@ -519,7 +997,9 @@ export default function AdminDashboard({
       candidate.vision || ""
     );
 
-    setCandidatePhoto(null);
+    setCandidatePhoto(
+      null
+    );
 
     setCandidatePhotoPreview(
       candidate.photo_url ||
@@ -573,7 +1053,9 @@ export default function AdminDashboard({
       event.target.files?.[0] ||
       null;
 
-    setCandidatePhoto(file);
+    setCandidatePhoto(
+      file
+    );
 
     if (!file) {
       if (
@@ -1108,9 +1590,22 @@ export default function AdminDashboard({
                   Pemilih
                 </button>
 
+                <button
+                  type="button"
+                  onClick={
+                    downloadVoterCards
+                  }
+                >
+                  🪪 Download Kartu
+                  Pemilih A4
+                </button>
+
                 <p className="subtitle">
-                  Simpan file token
-                  dengan aman.
+                  Simpan PDF kartu
+                  pemilih dengan aman.
+                  Token tidak disimpan
+                  sebagai teks biasa
+                  di database.
                 </p>
 
               </div>
@@ -1167,8 +1662,6 @@ export default function AdminDashboard({
                   ? "Edit Kandidat"
                   : "Tambah Kandidat"}
               </h3>
-
-              {/* PREVIEW FOTO */}
 
               <div className="candidate-photo-preview-area">
 
@@ -1502,8 +1995,6 @@ export default function AdminDashboard({
 
               </div>
             )}
-
-          {/* BELUM ADA */}
 
           {!candidateLoading &&
             candidates.length ===
