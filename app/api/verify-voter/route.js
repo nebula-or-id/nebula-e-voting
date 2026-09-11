@@ -125,16 +125,15 @@ export async function POST(request) {
     // 7. Jangan kirim session token ke browser
     // --------------------------------------------------
 
-    return Response.json({
-      success: true,
-      voter: {
-        name: result.full_name,
-        weight: result.weight,
-      },
-      election: {
-        name: election.name,
-      },
-    });
+return Response.json({
+  success: true,
+  voter: {
+    name: result.full_name,
+  },
+  election: {
+    name: election.name,
+  },
+});
   } catch (error) {
     console.error("Unexpected verify voter error:", error);
 
