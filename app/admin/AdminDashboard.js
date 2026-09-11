@@ -48,61 +48,41 @@ export default function AdminDashboard({
   const [candidates, setCandidates] =
     useState([]);
 
-  const [
-    candidateLoading,
-    setCandidateLoading,
-  ] = useState(false);
+  const [candidateLoading, setCandidateLoading] =
+    useState(false);
 
-  const [
-    showCandidateForm,
-    setShowCandidateForm,
-  ] = useState(false);
+  const [showCandidateForm, setShowCandidateForm] =
+    useState(false);
 
-  const [
-    editingCandidate,
-    setEditingCandidate,
-  ] = useState(null);
+  const [editingCandidate, setEditingCandidate] =
+    useState(null);
 
-  const [
-    candidateNumber,
-    setCandidateNumber,
-  ] = useState("");
+  const [candidateNumber, setCandidateNumber] =
+    useState("");
 
-  const [
-    candidateName,
-    setCandidateName,
-  ] = useState("");
+  const [candidateName, setCandidateName] =
+    useState("");
 
-  const [
-    candidateClass,
-    setCandidateClass,
-  ] = useState("");
+  const [candidateClass, setCandidateClass] =
+    useState("");
 
-  const [
-    candidateProgram,
-    setCandidateProgram,
-  ] = useState("");
+  const [candidateProgram, setCandidateProgram] =
+    useState("");
 
-  const [
-    candidatePhoto,
-    setCandidatePhoto,
-  ] = useState(null);
+  const [candidatePhoto, setCandidatePhoto] =
+    useState(null);
 
-  const [
-    candidatePhotoPreview,
-    setCandidatePhotoPreview,
-  ] = useState(null);
+  const [candidatePhotoPreview, setCandidatePhotoPreview] =
+    useState(null);
 
-  const [
-    removeExistingPhoto,
-    setRemoveExistingPhoto,
-  ] = useState(false);
+  const [removeExistingPhoto, setRemoveExistingPhoto] =
+    useState(false);
 
   const candidatePhotoRef =
     useRef(null);
 
   // ====================================================
-  // LOAD KANDIDAT OTOMATIS
+  // LOAD KANDIDAT SAAT HALAMAN DIBUKA
   // ====================================================
 
   useEffect(() => {
@@ -120,7 +100,9 @@ export default function AdminDashboard({
         : "Yakin ingin menutup pemilihan? Setelah ditutup, pemilih tidak dapat mengirim suara baru.";
 
     const confirmed =
-      window.confirm(confirmMessage);
+      window.confirm(
+        confirmMessage
+      );
 
     if (!confirmed) {
       return;
@@ -470,7 +452,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // RESET FORM KANDIDAT
+  // RESET FORM
   // ====================================================
 
   function resetCandidateForm() {
@@ -496,17 +478,24 @@ export default function AdminDashboard({
 
   function openCandidateForm() {
     resetCandidateForm();
+
     setEditingCandidate(null);
+
     setShowCandidateForm(true);
+
+    setMessage("");
   }
 
   // ====================================================
   // BUKA FORM EDIT
   // ====================================================
 
-  function openEditCandidate(
-    candidate
-  ) {
+  function openEditCandidate(candidate) {
+    console.log(
+      "Edit kandidat:",
+      candidate
+    );
+
     setEditingCandidate(
       candidate
     );
@@ -548,13 +537,29 @@ export default function AdminDashboard({
         "";
     }
 
-    setShowCandidateForm(true);
+    setShowCandidateForm(
+      true
+    );
+
+    setMessage("");
   }
+
+  // ====================================================
+  // TUTUP FORM
+  // ====================================================
 
   function closeCandidateForm() {
     resetCandidateForm();
-    setEditingCandidate(null);
-    setShowCandidateForm(false);
+
+    setEditingCandidate(
+      null
+    );
+
+    setShowCandidateForm(
+      false
+    );
+
+    setMessage("");
   }
 
   // ====================================================
@@ -571,7 +576,9 @@ export default function AdminDashboard({
     setCandidatePhoto(file);
 
     if (!file) {
-      if (editingCandidate) {
+      if (
+        editingCandidate
+      ) {
         setCandidatePhotoPreview(
           editingCandidate.photo_url ||
             null
@@ -586,7 +593,9 @@ export default function AdminDashboard({
     }
 
     const previewUrl =
-      URL.createObjectURL(file);
+      URL.createObjectURL(
+        file
+      );
 
     setCandidatePhotoPreview(
       previewUrl
@@ -598,7 +607,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // TAMBAH / EDIT KANDIDAT
+  // SIMPAN KANDIDAT
   // ====================================================
 
   async function saveCandidate() {
@@ -622,12 +631,9 @@ export default function AdminDashboard({
     }
 
     const isEditing =
-      Boolean(editingCandidate);
-
-    const actionText =
-      isEditing
-        ? "memperbarui"
-        : "menambahkan";
+      Boolean(
+        editingCandidate
+      );
 
     const confirmed =
       window.confirm(
@@ -640,7 +646,10 @@ export default function AdminDashboard({
       return;
     }
 
-    setCandidateLoading(true);
+    setCandidateLoading(
+      true
+    );
+
     setMessage("");
 
     try {
@@ -714,7 +723,7 @@ export default function AdminDashboard({
       if (!response.ok) {
         throw new Error(
           data.message ||
-            `Gagal ${actionText} kandidat.`
+            "Gagal menyimpan kandidat."
         );
       }
 
@@ -728,9 +737,14 @@ export default function AdminDashboard({
 
       await loadCandidates();
     } catch (error) {
+      console.error(
+        "Save candidate error:",
+        error
+      );
+
       setMessage(
         error.message ||
-          `Terjadi kesalahan saat ${actionText} kandidat.`
+          "Terjadi kesalahan saat menyimpan kandidat."
       );
     } finally {
       setCandidateLoading(
@@ -765,7 +779,10 @@ export default function AdminDashboard({
       return;
     }
 
-    setCandidateLoading(true);
+    setCandidateLoading(
+      true
+    );
+
     setMessage("");
 
     try {
@@ -801,6 +818,11 @@ export default function AdminDashboard({
 
       await loadCandidates();
     } catch (error) {
+      console.error(
+        "Delete candidate error:",
+        error
+      );
+
       setMessage(
         error.message ||
           "Terjadi kesalahan saat menghapus kandidat."
@@ -820,9 +842,7 @@ export default function AdminDashboard({
     <main className="page">
       <section className="card">
 
-        {/* ==============================================
-            HEADER
-        ============================================== */}
+        {/* HEADER */}
 
         <div className="badge">
           NEBULA E-VOTING
@@ -852,9 +872,7 @@ export default function AdminDashboard({
           {status.toUpperCase()}
         </div>
 
-        {/* ==============================================
-            STATISTIK
-        ============================================== */}
+        {/* STATISTIK */}
 
         <div className="stats">
 
@@ -913,9 +931,7 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* ==============================================
-            KONTROL PEMILIHAN
-        ============================================== */}
+        {/* KONTROL PEMILIHAN */}
 
         <div className="admin-actions">
 
@@ -997,9 +1013,7 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* ==============================================
-            DATA PEMILIH
-        ============================================== */}
+        {/* DATA PEMILIH */}
 
         <div className="admin-actions">
 
@@ -1104,9 +1118,7 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* ==============================================
-            DATA KANDIDAT
-        ============================================== */}
+        {/* DATA KANDIDAT */}
 
         <div className="admin-actions">
 
@@ -1145,9 +1157,7 @@ export default function AdminDashboard({
             </p>
           )}
 
-          {/* ============================================
-              FORM TAMBAH / EDIT
-          ============================================ */}
+          {/* FORM TAMBAH / EDIT */}
 
           {showCandidateForm && (
             <div className="candidate-form">
@@ -1196,8 +1206,7 @@ export default function AdminDashboard({
               <small>
                 JPG, PNG, atau WEBP.
                 Maksimal 5 MB.
-                Foto akan ditampilkan
-                dengan standar rasio
+                Standar tampilan
                 3:4.
               </small>
 
@@ -1213,15 +1222,15 @@ export default function AdminDashboard({
                       onChange={(
                         event
                       ) => {
-                        setRemoveExistingPhoto(
+                        const checked =
                           event.target
-                            .checked
+                            .checked;
+
+                        setRemoveExistingPhoto(
+                          checked
                         );
 
-                        if (
-                          event.target
-                            .checked
-                        ) {
+                        if (checked) {
                           setCandidatePhoto(
                             null
                           );
@@ -1365,20 +1374,16 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ============================================
-              LOADING
-          ============================================ */}
+          {/* LOADING */}
 
           {candidateLoading &&
             !showCandidateForm && (
-              <p className="subtitle">
-                Memuat data kandidat...
-              </p>
-            )}
+            <p className="subtitle">
+              Memuat data kandidat...
+            </p>
+          )}
 
-          {/* ============================================
-              DAFTAR KANDIDAT
-          ============================================ */}
+          {/* DAFTAR KANDIDAT */}
 
           {!candidateLoading &&
             candidates.length >
@@ -1452,11 +1457,16 @@ export default function AdminDashboard({
 
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={(
+                              event
+                            ) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+
                               openEditCandidate(
                                 candidate
-                              )
-                            }
+                              );
+                            }}
                             disabled={
                               candidateLoading
                             }
@@ -1466,11 +1476,16 @@ export default function AdminDashboard({
 
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={(
+                              event
+                            ) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+
                               deleteCandidate(
                                 candidate
-                              )
-                            }
+                              );
+                            }}
                             disabled={
                               candidateLoading
                             }
@@ -1488,22 +1503,22 @@ export default function AdminDashboard({
               </div>
             )}
 
+          {/* BELUM ADA */}
+
           {!candidateLoading &&
             candidates.length ===
               0 &&
             !showCandidateForm && (
-              <div className="info">
-                Belum ada data
-                kandidat yang
-                ditampilkan.
-              </div>
-            )}
+            <div className="info">
+              Belum ada data
+              kandidat yang
+              ditampilkan.
+            </div>
+          )}
 
         </div>
 
-        {/* ==============================================
-            PESAN SISTEM
-        ============================================== */}
+        {/* PESAN */}
 
         {message && (
           <div className="message">
