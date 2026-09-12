@@ -61,11 +61,24 @@ export default function AdminDashboard({
     useRef(null);
 
   // ====================================================
-  // HASIL FINALISASI PEMILIH
+  // HASIL FINALISASI
   // ====================================================
 
   const [savedVotersResult, setSavedVotersResult] =
     useState(null);
+
+  // ====================================================
+  // DAFTAR PEMILIH
+  // ====================================================
+
+  const [voterList, setVoterList] =
+    useState([]);
+
+  const [voterListLoading, setVoterListLoading] =
+    useState(false);
+
+  const [voterFilter, setVoterFilter] =
+    useState("all");
 
   // ====================================================
   // KANDIDAT
@@ -108,11 +121,12 @@ export default function AdminDashboard({
     useRef(null);
 
   // ====================================================
-  // LOAD KANDIDAT
+  // LOAD AWAL
   // ====================================================
 
   useEffect(() => {
     loadCandidates();
+    loadVoters();
   }, []);
 
   // ====================================================
@@ -226,7 +240,9 @@ export default function AdminDashboard({
         );
       }
 
-      setStatus("draft");
+      setStatus(
+        "draft"
+      );
 
       setMessage(
         "Pemilihan berhasil disiapkan kembali. Status sekarang DRAFT."
@@ -246,7 +262,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // IMPORT EXCEL → PREVIEW SAJA
+  // IMPORT EXCEL → PREVIEW
   // ====================================================
 
   async function importVoters() {
@@ -299,9 +315,38 @@ export default function AdminDashboard({
         await response.json();
 
       if (!response.ok) {
-        throw new Error(
+        let errorMessage =
           data.message ||
-            "Gagal membaca file Excel."
+          "Gagal membaca file Excel.";
+
+        if (
+          data.errors &&
+          Array.isArray(
+            data.errors
+          )
+        ) {
+          errorMessage +=
+            "\n\n" +
+            data.errors.join(
+              "\n"
+            );
+        }
+
+        if (
+          data.existing &&
+          Array.isArray(
+            data.existing
+          )
+        ) {
+          errorMessage +=
+            "\n\nNISN yang sudah terdaftar:\n" +
+            data.existing.join(
+              ", "
+            );
+        }
+
+        throw new Error(
+          errorMessage
         );
       }
 
@@ -334,22 +379,6 @@ export default function AdminDashboard({
         error
       );
 
-      // API bisa mengembalikan error validasi
-      // dalam bentuk data.errors.
-      try {
-        const response =
-          await fetch(
-            "/api/import-voters",
-            {
-              method: "POST",
-            }
-          );
-
-        void response;
-      } catch {
-        // Abaikan.
-      }
-
       setMessage(
         error.message ||
           "Terjadi kesalahan saat membaca Excel."
@@ -360,7 +389,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // EDIT BARIS PREVIEW
+  // EDIT PREVIEW PEMILIH
   // ====================================================
 
   function updatePreviewVoter(
@@ -384,7 +413,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // HAPUS BARIS PREVIEW
+  // HAPUS PREVIEW PEMILIH
   // ====================================================
 
   function removePreviewVoter(
@@ -412,7 +441,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // TAMBAH BARIS PEMILIH MANUAL
+  // TAMBAH PEMILIH MANUAL
   // ====================================================
 
   function addPreviewVoter() {
@@ -456,13 +485,14 @@ export default function AdminDashboard({
     setPreviewVoters([]);
     setPreviewErrors([]);
     setSavedVotersResult(null);
+
     setMessage(
       "Preview berhasil dibersihkan."
     );
   }
 
   // ====================================================
-  // VALIDASI PREVIEW DI BROWSER
+  // VALIDASI PREVIEW
   // ====================================================
 
   function validatePreviewVoters() {
@@ -676,12 +706,14 @@ export default function AdminDashboard({
       );
 
       setPreviewVoters([]);
-
       setPreviewErrors([]);
 
       setMessage(
         `✅ ${data.saved || 0} pemilih berhasil disimpan dan token berhasil dibuat.`
       );
+
+      // Refresh daftar pemilih
+      await loadVoters();
     } catch (error) {
       console.error(
         "Save voters error:",
@@ -693,12 +725,88 @@ export default function AdminDashboard({
           "Terjadi kesalahan saat menyimpan pemilih."
       );
     } finally {
-      setSavingVoters(false);
+      setSavingVoters(
+        false
+      );
     }
   }
 
   // ====================================================
-  // DOWNLOAD REKAP TOKEN
+  // LOAD DAFTAR PEMILIH
+  // ====================================================
+
+  async function loadVoters() {
+    setVoterListLoading(
+      true
+    );
+
+    try {
+      const response =
+        await fetch(
+          "/api/voters",
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Gagal mengambil daftar pemilih."
+        );
+      }
+
+      setVoterList(
+        data.voters || []
+      );
+    } catch (error) {
+      console.error(
+        "Load voters error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Gagal mengambil daftar pemilih."
+      );
+    } finally {
+      setVoterListLoading(
+        false
+      );
+    }
+  }
+
+  // ====================================================
+  // FILTER DAFTAR PEMILIH
+  // ====================================================
+
+  const filteredVoters =
+    voterList.filter(
+      (voter) => {
+        if (
+          voterFilter ===
+          "voted"
+        ) {
+          return voter.has_voted;
+        }
+
+        if (
+          voterFilter ===
+          "not-voted"
+        ) {
+          return !voter.has_voted;
+        }
+
+        return true;
+      }
+    );
+
+  // ====================================================
+  // DOWNLOAD REKAP TOKEN DARI HASIL BARU
   // ====================================================
 
   function downloadSavedTokens() {
@@ -784,7 +892,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // DOWNLOAD KARTU PEMILIH A4
+  // GENERATE KARTU DARI HASIL FINALISASI
   // ====================================================
 
   async function downloadSavedVoterCards() {
@@ -831,14 +939,12 @@ export default function AdminDashboard({
           StandardFonts.HelveticaBold
         );
 
-      // A4 portrait
       const pageWidth =
         595.28;
 
       const pageHeight =
         841.89;
 
-      // 2 × 4 kartu
       const columns = 2;
       const rowsPerPage = 4;
 
@@ -940,7 +1046,6 @@ export default function AdminDashboard({
               cardHeight -
             row * gap;
 
-          // Kartu
           page.drawRectangle({
             x,
             y,
@@ -953,7 +1058,6 @@ export default function AdminDashboard({
             borderWidth: 1,
           });
 
-          // Header
           page.drawRectangle({
             x:
               x + 8,
@@ -1003,7 +1107,6 @@ export default function AdminDashboard({
             }
           );
 
-          // Identitas
           const left =
             x + 16;
 
@@ -1030,7 +1133,6 @@ export default function AdminDashboard({
           page.drawText(
             String(
               voter.nama ??
-                voter.name ??
                 "-"
             ),
             {
@@ -1064,7 +1166,6 @@ export default function AdminDashboard({
           page.drawText(
             String(
               voter.nisn ??
-                voter.voter_code ??
                 "-"
             ),
             {
@@ -1078,7 +1179,6 @@ export default function AdminDashboard({
             }
           );
 
-          // TOKEN
           const tokenBoxHeight =
             48;
 
@@ -1122,8 +1222,8 @@ export default function AdminDashboard({
           const token =
             String(
               voter.token ??
-                ""
-            ).trim() || "-";
+                "-"
+            ).trim();
 
           const tokenSize =
             token.length > 10
@@ -1158,7 +1258,6 @@ export default function AdminDashboard({
             }
           );
 
-          // Footer
           page.drawText(
             "Gunakan token ini satu kali untuk memberikan suara.",
             {
@@ -1250,7 +1349,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // KANDIDAT - LOAD
+  // KANDIDAT
   // ====================================================
 
   async function loadCandidates() {
@@ -1298,10 +1397,6 @@ export default function AdminDashboard({
     }
   }
 
-  // ====================================================
-  // RESET FORM KANDIDAT
-  // ====================================================
-
   function resetCandidateForm() {
     setCandidateNumber("");
     setCandidateName("");
@@ -1323,10 +1418,6 @@ export default function AdminDashboard({
     }
   }
 
-  // ====================================================
-  // TAMBAH KANDIDAT
-  // ====================================================
-
   function openCandidateForm() {
     resetCandidateForm();
 
@@ -1340,10 +1431,6 @@ export default function AdminDashboard({
 
     setMessage("");
   }
-
-  // ====================================================
-  // EDIT KANDIDAT
-  // ====================================================
 
   function openEditCandidate(
     candidate
@@ -1396,10 +1483,6 @@ export default function AdminDashboard({
     setMessage("");
   }
 
-  // ====================================================
-  // TUTUP FORM
-  // ====================================================
-
   function closeCandidateForm() {
     resetCandidateForm();
 
@@ -1413,10 +1496,6 @@ export default function AdminDashboard({
 
     setMessage("");
   }
-
-  // ====================================================
-  // PREVIEW FOTO KANDIDAT
-  // ====================================================
 
   function handlePhotoChange(
     event
@@ -1459,10 +1538,6 @@ export default function AdminDashboard({
       false
     );
   }
-
-  // ====================================================
-  // SIMPAN KANDIDAT
-  // ====================================================
 
   async function saveCandidate() {
     if (status !== "draft") {
@@ -1607,10 +1682,6 @@ export default function AdminDashboard({
     }
   }
 
-  // ====================================================
-  // HAPUS KANDIDAT
-  // ====================================================
-
   async function deleteCandidate(
     candidate
   ) {
@@ -1696,9 +1767,7 @@ export default function AdminDashboard({
     <main className="page">
       <section className="card">
 
-        {/* ==================================================
-            HEADER
-        ================================================== */}
+        {/* HEADER */}
 
         <div className="badge">
           NEBULA E-VOTING
@@ -1712,6 +1781,8 @@ export default function AdminDashboard({
           Panel administrasi
           pemilihan
         </p>
+
+        {/* INFO */}
 
         <div className="info">
           <strong>
@@ -1728,9 +1799,7 @@ export default function AdminDashboard({
           {status.toUpperCase()}
         </div>
 
-        {/* ==================================================
-            STATISTIK
-        ================================================== */}
+        {/* STATISTIK */}
 
         <div className="stats">
 
@@ -1784,9 +1853,7 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* ==================================================
-            KONTROL PEMILIHAN
-        ================================================== */}
+        {/* KONTROL PEMILIHAN */}
 
         <div className="admin-actions">
 
@@ -1803,7 +1870,8 @@ export default function AdminDashboard({
               loading ||
               importing ||
               savingVoters ||
-              candidateLoading
+              candidateLoading ||
+              voterListLoading
             }
           >
             {loading
@@ -1824,7 +1892,8 @@ export default function AdminDashboard({
                 loading ||
                 importing ||
                 savingVoters ||
-                candidateLoading
+                candidateLoading ||
+                voterListLoading
               }
             >
               {loading
@@ -1846,7 +1915,8 @@ export default function AdminDashboard({
                 loading ||
                 importing ||
                 savingVoters ||
-                candidateLoading
+                candidateLoading ||
+                voterListLoading
               }
             >
               {loading
@@ -1883,9 +1953,11 @@ export default function AdminDashboard({
 
           <p className="subtitle">
             Import, periksa, koreksi,
-            kemudian simpan data
+            simpan, dan pantau status
             pemilih.
           </p>
+
+          {/* IMPORT */}
 
           <div className="info">
 
@@ -1909,15 +1981,6 @@ export default function AdminDashboard({
             <br />
 
             NISN | Nama | Kategori
-
-            <br />
-            <br />
-
-            <strong>
-              Belum disimpan:
-            </strong>{" "}
-            {previewVoters.length}
-            {" "}data
 
           </div>
 
@@ -1961,9 +2024,9 @@ export default function AdminDashboard({
             </p>
           )}
 
-          {/* ================================================
+          {/* =================================================
               PREVIEW
-          ================================================ */}
+          ================================================= */}
 
           {previewVoters.length >
             0 && (
@@ -1999,9 +2062,7 @@ export default function AdminDashboard({
                     Data perlu
                     diperbaiki:
                   </strong>
-
                   <br />
-
                   {previewErrors.join(
                     "\n"
                   )}
@@ -2028,6 +2089,7 @@ export default function AdminDashboard({
                 >
                   <thead>
                     <tr>
+
                       <th
                         style={{
                           padding:
@@ -2092,10 +2154,12 @@ export default function AdminDashboard({
                       >
                         Aksi
                       </th>
+
                     </tr>
                   </thead>
 
                   <tbody>
+
                     {previewVoters.map(
                       (
                         voter,
@@ -2261,8 +2325,6 @@ export default function AdminDashboard({
                                 "1px solid #d0d5dd",
                               textAlign:
                                 "center",
-                              whiteSpace:
-                                "nowrap",
                             }}
                           >
                             <button
@@ -2288,6 +2350,7 @@ export default function AdminDashboard({
                         </tr>
                       )
                     )}
+
                   </tbody>
                 </table>
               </div>
@@ -2342,77 +2405,450 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ================================================
+          {/* =================================================
               HASIL FINALISASI
-          ================================================ */}
+          ================================================= */}
 
           {savedVotersResult?.voters &&
             savedVotersResult
               .voters.length >
               0 && (
-            <div className="import-result">
+              <div className="import-result">
 
-              <h3>
-                ✅ Pemilih Berhasil
-                Disimpan
-              </h3>
+                <h3>
+                  ✅ Pemilih Berhasil
+                  Disimpan
+                </h3>
 
-              <p>
-                {
-                  savedVotersResult.saved
-                }{" "}
-                pemilih berhasil
-                disimpan.
-              </p>
+                <p>
+                  {
+                    savedVotersResult.saved
+                  }{" "}
+                  pemilih berhasil
+                  disimpan.
+                </p>
 
-              <p className="subtitle">
-                Token telah dibuat.
-                Database menyimpan
-                hash token, bukan
-                token teks biasa.
-              </p>
+                <button
+                  type="button"
+                  onClick={
+                    downloadSavedTokens
+                  }
+                >
+                  📄 Download Rekap
+                  Token
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    downloadSavedVoterCards
+                  }
+                >
+                  🪪 Download Kartu
+                  Pemilih A4
+                </button>
+
+                <div className="info">
+                  <strong>
+                    Penting:
+                  </strong>
+                  <br />
+                  Simpan file token dan
+                  PDF kartu dengan aman.
+                  Token tidak ditampilkan
+                  dalam daftar pemilih.
+                </div>
+
+              </div>
+            )}
+
+          {/* =================================================
+              DAFTAR PEMILIH TERSIMPAN
+          ================================================= */}
+
+          <div
+            style={{
+              marginTop:
+                "32px",
+              textAlign:
+                "left",
+            }}
+          >
+
+            <div
+              style={{
+                display:
+                  "flex",
+                flexWrap:
+                  "wrap",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "space-between",
+                gap:
+                  "10px",
+              }}
+            >
+
+              <div>
+
+                <h3
+                  style={{
+                    marginBottom:
+                      "4px",
+                  }}
+                >
+                  Daftar Pemilih
+                </h3>
+
+                <p className="subtitle">
+                  {
+                    voterList.length
+                  }{" "}
+                  pemilih tersimpan.
+                </p>
+
+              </div>
 
               <button
                 type="button"
                 onClick={
-                  downloadSavedTokens
+                  loadVoters
+                }
+                disabled={
+                  voterListLoading
                 }
               >
-                📄 Download Rekap
-                Token
+                {voterListLoading
+                  ? "🔄 Memuat..."
+                  : "🔄 Refresh"}
+              </button>
+
+            </div>
+
+            {/* FILTER */}
+
+            <div
+              style={{
+                marginTop:
+                  "16px",
+                display:
+                  "flex",
+                flexWrap:
+                  "wrap",
+                gap:
+                  "8px",
+              }}
+            >
+
+              <button
+                type="button"
+                onClick={() =>
+                  setVoterFilter(
+                    "all"
+                  )
+                }
+                disabled={
+                  voterFilter ===
+                  "all"
+                }
+              >
+                Semua
               </button>
 
               <button
                 type="button"
-                onClick={
-                  downloadSavedVoterCards
+                onClick={() =>
+                  setVoterFilter(
+                    "voted"
+                  )
+                }
+                disabled={
+                  voterFilter ===
+                  "voted"
                 }
               >
-                🪪 Download Kartu
-                Pemilih A4
+                Sudah Memilih
               </button>
 
+              <button
+                type="button"
+                onClick={() =>
+                  setVoterFilter(
+                    "not-voted"
+                  )
+                }
+                disabled={
+                  voterFilter ===
+                  "not-voted"
+                }
+              >
+                Belum Memilih
+              </button>
+
+            </div>
+
+            {/* TABEL */}
+
+            {voterListLoading ? (
+              <div className="info">
+                Memuat daftar
+                pemilih...
+              </div>
+            ) : voterList.length ===
+              0 ? (
+              <div className="info">
+                Belum ada data
+                pemilih tersimpan.
+              </div>
+            ) : (
               <div
-                className="info"
                 style={{
+                  overflowX:
+                    "auto",
                   marginTop:
                     "16px",
                 }}
               >
-                <strong>
-                  Penting:
-                </strong>
-                <br />
-                Simpan file token dan
-                PDF kartu dengan aman.
-                Token tidak dapat
-                diambil kembali dari
-                database sebagai teks
-                biasa.
-              </div>
 
-            </div>
-          )}
+                <table
+                  style={{
+                    width:
+                      "100%",
+                    minWidth:
+                      "700px",
+                    borderCollapse:
+                      "collapse",
+                    fontSize:
+                      "13px",
+                  }}
+                >
+
+                  <thead>
+
+                    <tr>
+
+                      <th
+                        style={{
+                          padding:
+                            "10px",
+                          border:
+                            "1px solid #d0d5dd",
+                          background:
+                            "#f8fafc",
+                        }}
+                      >
+                        No
+                      </th>
+
+                      <th
+                        style={{
+                          padding:
+                            "10px",
+                          border:
+                            "1px solid #d0d5dd",
+                          background:
+                            "#f8fafc",
+                        }}
+                      >
+                        NISN
+                      </th>
+
+                      <th
+                        style={{
+                          padding:
+                            "10px",
+                          border:
+                            "1px solid #d0d5dd",
+                          background:
+                            "#f8fafc",
+                        }}
+                      >
+                        Nama
+                      </th>
+
+                      <th
+                        style={{
+                          padding:
+                            "10px",
+                          border:
+                            "1px solid #d0d5dd",
+                          background:
+                            "#f8fafc",
+                        }}
+                      >
+                        Kategori
+                      </th>
+
+                      <th
+                        style={{
+                          padding:
+                            "10px",
+                          border:
+                            "1px solid #d0d5dd",
+                          background:
+                            "#f8fafc",
+                        }}
+                      >
+                        Status
+                      </th>
+
+                      <th
+                        style={{
+                          padding:
+                            "10px",
+                          border:
+                            "1px solid #d0d5dd",
+                          background:
+                            "#f8fafc",
+                        }}
+                      >
+                        Waktu
+                      </th>
+
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {filteredVoters.map(
+                      (
+                        voter
+                      ) => (
+                        <tr
+                          key={
+                            voter.id
+                          }
+                        >
+
+                          <td
+                            style={{
+                              padding:
+                                "10px",
+                              border:
+                                "1px solid #d0d5dd",
+                              textAlign:
+                                "center",
+                            }}
+                          >
+                            {
+                              voter.no
+                            }
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "10px",
+                              border:
+                                "1px solid #d0d5dd",
+                              fontWeight:
+                                "600",
+                            }}
+                          >
+                            {
+                              voter.nisn
+                            }
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "10px",
+                              border:
+                                "1px solid #d0d5dd",
+                            }}
+                          >
+                            {
+                              voter.nama
+                            }
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "10px",
+                              border:
+                                "1px solid #d0d5dd",
+                            }}
+                          >
+                            {
+                              voter.kategori
+                            }
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "10px",
+                              border:
+                                "1px solid #d0d5dd",
+                              textAlign:
+                                "center",
+                              fontWeight:
+                                "700",
+                            }}
+                          >
+
+                            {voter.has_voted
+                              ? "✅ Sudah"
+                              : "⏳ Belum"}
+
+                          </td>
+
+                          <td
+                            style={{
+                              padding:
+                                "10px",
+                              border:
+                                "1px solid #d0d5dd",
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            {voter.voted_at
+                              ? new Date(
+                                  voter.voted_at
+                                ).toLocaleString(
+                                  "id-ID"
+                                )
+                              : "-"}
+
+                          </td>
+
+                        </tr>
+                      )
+                    )}
+
+                  </tbody>
+
+                </table>
+
+                <p
+                  className="subtitle"
+                  style={{
+                    marginTop:
+                      "12px",
+                    textAlign:
+                      "left",
+                  }}
+                >
+                  Menampilkan{" "}
+                  {
+                    filteredVoters.length
+                  }{" "}
+                  dari{" "}
+                  {
+                    voterList.length
+                  }{" "}
+                  pemilih.
+                </p>
+
+              </div>
+            )}
+
+          </div>
 
         </div>
 
@@ -2441,7 +2877,8 @@ export default function AdminDashboard({
                 loading ||
                 importing ||
                 savingVoters ||
-                candidateLoading
+                candidateLoading ||
+                voterListLoading
               }
             >
               ➕ Tambah Kandidat
@@ -2807,7 +3244,7 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* PESAN SISTEM */}
+        {/* PESAN */}
 
         {message && (
           <div className="message">
