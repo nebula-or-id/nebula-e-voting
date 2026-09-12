@@ -1,12 +1,32 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 
-async function requireAdmin() {
+export const dynamic = "force-dynamic";
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+
+  if (!url || !secretKey) {
+    throw new Error(
+      "Konfigurasi Supabase server belum lengkap."
+    );
+  }
+
+  return createClient(url, secretKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+async function getCurrentUser() {
   const cookieStore = await cookies();
 
-  const supabase = createServerClient(
+  const supabaseAuth = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
@@ -14,286 +34,174 @@ async function requireAdmin() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll() {},
+        setAll() {
+          // Tidak perlu menulis cookie untuk route ini.
+        },
       },
     }
   );
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabaseAuth.auth.getUser();
 
-  if (!user) {
-    return {
-      authorized: false,
-      response: NextResponse.json(
-        {
-          success: false,
-          message: "Belum login sebagai admin.",
-        },
-        { status: 401 }
-      ),
-    };
-  }
-
-  if (user.email !== "admin@nebula.or.id") {
-    return {
-      authorized: false,
-      response: NextResponse.json(
-        {
-          success: false,
-          message: "Akses admin ditolak.",
-        },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return {
-    authorized: true,
-    user,
-  };
+  return user;
 }
 
-export async function POST() {
+export async function DELETE() {
   try {
-    // ====================================================
-    // CEK ADMIN
-    // ====================================================
+    const user = await getCurrentUser();
 
-    const auth = await requireAdmin();
-
-    if (!auth.authorized) {
-      return auth.response;
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Anda belum login.",
+        },
+        { status: 401 }
+      );
     }
 
-    // ====================================================
-    // CARI PEMILIHAN
-    // ====================================================
+    if (user.email !== "admin@nebula.or.id") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Akses ditolak.",
+        },
+        { status: 403 }
+      );
+    }
 
+    const supabaseAdmin = getAdminClient();
+
+    // Cari pemilihan aktif
     const { data: election, error: electionError } =
       await supabaseAdmin
         .from("elections")
-        .select(
-          "id, name, status"
-        )
+        .select("id,name,status")
         .eq(
           "name",
           "Pemilihan Ketua KIR Nebula Periode 2026/2027"
         )
-        .single();
+        .maybeSingle();
 
-    if (
-      electionError ||
-      !election
-    ) {
-      console.error(
-        "Delete test voters election error:",
-        electionError
+    if (electionError) {
+      throw new Error(
+        `Gagal mengambil data pemilihan: ${electionError.message}`
       );
+    }
 
+    if (!election) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Data pemilihan tidak ditemukan.",
+          message: "Data pemilihan tidak ditemukan.",
         },
         { status: 404 }
       );
     }
 
-    // ====================================================
-    // WAJIB DRAFT
-    // ====================================================
-
-    if (
-      election.status !==
-      "draft"
-    ) {
+    // Data test hanya boleh dihapus saat DRAFT
+    if (election.status !== "draft") {
       return NextResponse.json(
         {
           success: false,
           message:
-            "Penghapusan data test hanya dapat dilakukan saat status DRAFT.",
+            "Data test hanya boleh dihapus saat status pemilihan DRAFT.",
         },
-        { status: 409 }
+        { status: 400 }
       );
     }
 
-    // ====================================================
-    // AMBIL VOTER TEST
-    // HANYA voter_code DIAWALI TEST
-    // ====================================================
+    // Ambil seluruh voter test
+    const { data: testVoters, error: voterError } =
+      await supabaseAdmin
+        .from("voters")
+        .select("id,voter_code,full_name")
+        .eq("election_id", election.id)
+        .ilike("voter_code", "TEST%");
 
-    const {
-      data: testVoters,
-      error: voterFetchError,
-    } = await supabaseAdmin
-      .from("voters")
-      .select(
-        "id, voter_code, full_name"
-      )
-      .eq(
-        "election_id",
-        election.id
-      )
-      .ilike(
-        "voter_code",
-        "TEST%"
-      );
-
-    if (voterFetchError) {
-      console.error(
-        "Fetch test voters error:",
-        voterFetchError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Gagal mengambil data pemilih test.",
-        },
-        { status: 500 }
+    if (voterError) {
+      throw new Error(
+        `Gagal mengambil data voter test: ${voterError.message}`
       );
     }
 
-    // ====================================================
-    // TIDAK ADA DATA TEST
-    // ====================================================
+    const voters = testVoters || [];
 
-    if (
-      !testVoters ||
-      testVoters.length === 0
-    ) {
+    if (voters.length === 0) {
       return NextResponse.json({
         success: true,
         deleted: 0,
-        deleted_voters: [],
-        message:
-          "Tidak ada data pemilih test yang ditemukan.",
+        deletedVoters: [],
+        message: "Tidak ada data test yang ditemukan.",
       });
     }
 
-    const testVoterIds =
-      testVoters.map(
-        (voter) => voter.id
-      );
+    const voterIds = voters.map((voter) => voter.id);
 
-    // ====================================================
-    // HAPUS SESSION TEST
-    // ====================================================
+    // Hapus session voting milik voter test
+    const { error: sessionError } =
+      await supabaseAdmin
+        .from("voting_sessions")
+        .delete()
+        .in("voter_id", voterIds);
 
-    const {
-      error: sessionDeleteError,
-    } = await supabaseAdmin
-      .from("voting_sessions")
-      .delete()
-      .in(
-        "voter_id",
-        testVoterIds
-      );
-
-    if (sessionDeleteError) {
-      console.error(
-        "Delete test sessions error:",
-        sessionDeleteError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Gagal menghapus session pemilih test.",
-        },
-        { status: 500 }
+    if (sessionError) {
+      throw new Error(
+        `Gagal menghapus session test: ${sessionError.message}`
       );
     }
 
-    // ====================================================
-    // HAPUS VOTER TEST
-    // ====================================================
+    // Hapus voter test
+    const { error: deleteError } =
+      await supabaseAdmin
+        .from("voters")
+        .delete()
+        .in("id", voterIds);
 
-    const {
-      error: voterDeleteError,
-    } = await supabaseAdmin
-      .from("voters")
-      .delete()
-      .in(
-        "id",
-        testVoterIds
-      );
-
-    if (voterDeleteError) {
-      console.error(
-        "Delete test voters error:",
-        voterDeleteError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Gagal menghapus data pemilih test.",
-        },
-        { status: 500 }
+    if (deleteError) {
+      throw new Error(
+        `Gagal menghapus data voter test: ${deleteError.message}`
       );
     }
 
-    // ====================================================
-    // AUDIT LOG
-    // ====================================================
-
-    const {
-      error: auditError,
-    } = await supabaseAdmin
-      .from("audit_logs")
-      .insert({
-        election_id:
-          election.id,
-        event_type:
-          "test_voters_deleted",
-        metadata: {
-          deleted_count:
-            testVoters.length,
-          deleted_voters:
-            testVoters.map(
-              (voter) => ({
-                nisn:
-                  voter.voter_code,
-                nama:
-                  voter.full_name,
-              })
+    // Catat audit
+    const { error: auditError } =
+      await supabaseAdmin
+        .from("audit_logs")
+        .insert({
+          election_id: election.id,
+          event_type: "test_voters_deleted",
+          metadata: {
+            count: voters.length,
+            voter_codes: voters.map(
+              (voter) => voter.voter_code
             ),
-        },
-      });
+          },
+        });
 
     if (auditError) {
       console.error(
-        "Audit log error:",
+        "Audit log warning:",
         auditError
       );
     }
 
-    // ====================================================
-    // SELESAI
-    // ====================================================
-
     return NextResponse.json({
       success: true,
-      deleted:
-        testVoters.length,
-      deleted_voters:
-        testVoters.map(
-          (voter) =>
-            voter.voter_code
-        ),
-      message:
-        `Berhasil menghapus ${testVoters.length} data pemilih test.`,
+      deleted: voters.length,
+      deletedVoters: voters.map(
+        (voter) => ({
+          nisn: voter.voter_code,
+          nama: voter.full_name,
+        })
+      ),
+      message: `${voters.length} data test berhasil dihapus.`,
     });
   } catch (error) {
     console.error(
-      "Delete test voters fatal error:",
+      "Delete test voters error:",
       error
     );
 
