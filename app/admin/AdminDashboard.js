@@ -80,6 +80,9 @@ export default function AdminDashboard({
   const [voterFilter, setVoterFilter] =
     useState("all");
 
+  const [printingAllCards, setPrintingAllCards] =
+    useState(false);
+
   // ====================================================
   // KANDIDAT
   // ====================================================
@@ -712,7 +715,6 @@ export default function AdminDashboard({
         `✅ ${data.saved || 0} pemilih berhasil disimpan dan token berhasil dibuat.`
       );
 
-      // Refresh daftar pemilih
       await loadVoters();
     } catch (error) {
       console.error(
@@ -781,6 +783,146 @@ export default function AdminDashboard({
   }
 
   // ====================================================
+  // CETAK SEMUA KARTU
+  // ====================================================
+
+  async function downloadAllVoterCards() {
+    if (
+      voterList.length ===
+      0
+    ) {
+      setMessage(
+        "Belum ada pemilih tersimpan yang dapat dicetak."
+      );
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        `Cetak semua kartu pemilih?\n\n` +
+          `Jumlah pemilih: ${voterList.length}\n` +
+          "Sistem akan membuat PDF A4 menggunakan token tetap masing-masing pemilih.\n\n" +
+          "Lanjutkan?"
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setPrintingAllCards(true);
+    setMessage("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/admin-voter-cards",
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
+
+      const contentType =
+        response.headers.get(
+          "content-type"
+        ) || "";
+
+      if (!response.ok) {
+        let errorMessage =
+          "Gagal membuat kartu pemilih.";
+
+        if (
+          contentType.includes(
+            "application/json"
+          )
+        ) {
+          const data =
+            await response.json();
+
+          errorMessage =
+            data.message ||
+            errorMessage;
+
+          if (
+            data.missing &&
+            Array.isArray(
+              data.missing
+            )
+          ) {
+            errorMessage +=
+              "\n\nNISN tanpa token terenkripsi:\n" +
+              data.missing.join(
+                ", "
+              );
+          }
+        } else {
+          const text =
+            await response.text();
+
+          if (text) {
+            errorMessage =
+              text;
+          }
+        }
+
+        throw new Error(
+          errorMessage
+        );
+      }
+
+      const blob =
+        await response.blob();
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      link.href = url;
+
+      link.download =
+        "kartu-pemilih-nebula-semua-A4.pdf";
+
+      document.body.appendChild(
+        link
+      );
+
+      link.click();
+
+      document.body.removeChild(
+        link
+      );
+
+      URL.revokeObjectURL(
+        url
+      );
+
+      setMessage(
+        `✅ Kartu ${voterList.length} pemilih berhasil dibuat.`
+      );
+    } catch (error) {
+      console.error(
+        "Download all voter cards error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Gagal membuat kartu pemilih."
+      );
+    } finally {
+      setPrintingAllCards(
+        false
+      );
+    }
+  }
+
+  // ====================================================
   // FILTER DAFTAR PEMILIH
   // ====================================================
 
@@ -806,7 +948,7 @@ export default function AdminDashboard({
     );
 
   // ====================================================
-  // DOWNLOAD REKAP TOKEN DARI HASIL BARU
+  // DOWNLOAD REKAP TOKEN HASIL FINALISASI
   // ====================================================
 
   function downloadSavedTokens() {
@@ -892,7 +1034,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // GENERATE KARTU DARI HASIL FINALISASI
+  // KARTU DARI HASIL FINALISASI
   // ====================================================
 
   async function downloadSavedVoterCards() {
@@ -911,9 +1053,8 @@ export default function AdminDashboard({
 
     const confirmed =
       window.confirm(
-        "Buat Kartu Pemilih A4?\n\n" +
-          `Jumlah kartu: ${voters.length}\n` +
-          "Layout: A4, 2 kolom × 4 baris.\n\n" +
+        "Buat Kartu Pemilih A4 dari hasil finalisasi?\n\n" +
+          `Jumlah kartu: ${voters.length}\n\n` +
           "Lanjutkan?"
       );
 
@@ -1000,13 +1141,10 @@ export default function AdminDashboard({
 
       voters.forEach(
         (voter, index) => {
-          const cardsPerPage =
-            columns *
-            rowsPerPage;
-
           const indexInPage =
             index %
-            cardsPerPage;
+            (columns *
+              rowsPerPage);
 
           if (
             indexInPage === 0
@@ -1349,7 +1487,7 @@ export default function AdminDashboard({
   }
 
   // ====================================================
-  // KANDIDAT
+  // LOAD KANDIDAT
   // ====================================================
 
   async function loadCandidates() {
@@ -1397,6 +1535,10 @@ export default function AdminDashboard({
     }
   }
 
+  // ====================================================
+  // RESET FORM KANDIDAT
+  // ====================================================
+
   function resetCandidateForm() {
     setCandidateNumber("");
     setCandidateName("");
@@ -1418,6 +1560,10 @@ export default function AdminDashboard({
     }
   }
 
+  // ====================================================
+  // TAMBAH KANDIDAT
+  // ====================================================
+
   function openCandidateForm() {
     resetCandidateForm();
 
@@ -1431,6 +1577,10 @@ export default function AdminDashboard({
 
     setMessage("");
   }
+
+  // ====================================================
+  // EDIT KANDIDAT
+  // ====================================================
 
   function openEditCandidate(
     candidate
@@ -1458,7 +1608,9 @@ export default function AdminDashboard({
       candidate.vision || ""
     );
 
-    setCandidatePhoto(null);
+    setCandidatePhoto(
+      null
+    );
 
     setCandidatePhotoPreview(
       candidate.photo_url ||
@@ -1483,6 +1635,10 @@ export default function AdminDashboard({
     setMessage("");
   }
 
+  // ====================================================
+  // TUTUP FORM
+  // ====================================================
+
   function closeCandidateForm() {
     resetCandidateForm();
 
@@ -1496,6 +1652,10 @@ export default function AdminDashboard({
 
     setMessage("");
   }
+
+  // ====================================================
+  // PREVIEW FOTO
+  // ====================================================
 
   function handlePhotoChange(
     event
@@ -1538,6 +1698,10 @@ export default function AdminDashboard({
       false
     );
   }
+
+  // ====================================================
+  // SIMPAN KANDIDAT
+  // ====================================================
 
   async function saveCandidate() {
     if (status !== "draft") {
@@ -1682,6 +1846,10 @@ export default function AdminDashboard({
     }
   }
 
+  // ====================================================
+  // HAPUS KANDIDAT
+  // ====================================================
+
   async function deleteCandidate(
     candidate
   ) {
@@ -1782,7 +1950,7 @@ export default function AdminDashboard({
           pemilihan
         </p>
 
-        {/* INFO */}
+        {/* INFO PEMILIHAN */}
 
         <div className="info">
           <strong>
@@ -1807,6 +1975,7 @@ export default function AdminDashboard({
             <span>
               Total Pemilih
             </span>
+
             <strong>
               {totalVoters}
             </strong>
@@ -1816,6 +1985,7 @@ export default function AdminDashboard({
             <span>
               Sudah Memilih
             </span>
+
             <strong>
               {votedVoters}
             </strong>
@@ -1825,6 +1995,7 @@ export default function AdminDashboard({
             <span>
               Belum Memilih
             </span>
+
             <strong>
               {notVotedVoters}
             </strong>
@@ -1834,6 +2005,7 @@ export default function AdminDashboard({
             <span>
               Partisipasi
             </span>
+
             <strong>
               {Number(
                 participation
@@ -1846,6 +2018,7 @@ export default function AdminDashboard({
             <span>
               Total Ballot
             </span>
+
             <strong>
               {totalBallots}
             </strong>
@@ -1871,7 +2044,8 @@ export default function AdminDashboard({
               importing ||
               savingVoters ||
               candidateLoading ||
-              voterListLoading
+              voterListLoading ||
+              printingAllCards
             }
           >
             {loading
@@ -1893,7 +2067,8 @@ export default function AdminDashboard({
                 importing ||
                 savingVoters ||
                 candidateLoading ||
-                voterListLoading
+                voterListLoading ||
+                printingAllCards
               }
             >
               {loading
@@ -1916,7 +2091,8 @@ export default function AdminDashboard({
                 importing ||
                 savingVoters ||
                 candidateLoading ||
-                voterListLoading
+                voterListLoading ||
+                printingAllCards
               }
             >
               {loading
@@ -1928,9 +2104,8 @@ export default function AdminDashboard({
           {status ===
             "closed" && (
             <p className="closed-message">
-              Pemilihan sudah
-              ditutup. Gunakan
-              tombol{" "}
+              Pemilihan sudah ditutup.
+              Gunakan tombol{" "}
               <strong>
                 Siapkan Pemilihan
               </strong>{" "}
@@ -1957,8 +2132,6 @@ export default function AdminDashboard({
             pemilih.
           </p>
 
-          {/* IMPORT */}
-
           <div className="info">
 
             <strong>
@@ -1983,6 +2156,8 @@ export default function AdminDashboard({
             NISN | Nama | Kategori
 
           </div>
+
+          {/* IMPORT */}
 
           <input
             ref={
@@ -2077,6 +2252,7 @@ export default function AdminDashboard({
                     "16px",
                 }}
               >
+
                 <table
                   style={{
                     width:
@@ -2087,6 +2263,7 @@ export default function AdminDashboard({
                       "14px",
                   }}
                 >
+
                   <thead>
                     <tr>
 
@@ -2296,6 +2473,7 @@ export default function AdminDashboard({
                                   "#fff",
                               }}
                             >
+
                               {CATEGORY_OPTIONS.map(
                                 (
                                   category
@@ -2314,6 +2492,7 @@ export default function AdminDashboard({
                                   </option>
                                 )
                               )}
+
                             </select>
                           </td>
 
@@ -2327,6 +2506,7 @@ export default function AdminDashboard({
                                 "center",
                             }}
                           >
+
                             <button
                               type="button"
                               onClick={() =>
@@ -2345,6 +2525,7 @@ export default function AdminDashboard({
                             >
                               🗑️ Hapus
                             </button>
+
                           </td>
 
                         </tr>
@@ -2352,7 +2533,9 @@ export default function AdminDashboard({
                     )}
 
                   </tbody>
+
                 </table>
+
               </div>
 
               <div
@@ -2445,19 +2628,22 @@ export default function AdminDashboard({
                   }
                 >
                   🪪 Download Kartu
-                  Pemilih A4
+                  Batch Ini
                 </button>
 
-                <div className="info">
+                <p className="subtitle">
+                  Kartu batch ini hanya
+                  digunakan sebagai hasil
+                  finalisasi saat ini.
+                  Untuk mencetak seluruh
+                  pemilih yang tersimpan,
+                  gunakan tombol
                   <strong>
-                    Penting:
-                  </strong>
-                  <br />
-                  Simpan file token dan
-                  PDF kartu dengan aman.
-                  Token tidak ditampilkan
-                  dalam daftar pemilih.
-                </div>
+                    {" "}
+                    Cetak Semua Kartu
+                  </strong>{" "}
+                  di bagian Daftar Pemilih.
+                </p>
 
               </div>
             )}
@@ -2510,19 +2696,41 @@ export default function AdminDashboard({
 
               </div>
 
-              <button
-                type="button"
-                onClick={
-                  loadVoters
-                }
-                disabled={
-                  voterListLoading
-                }
-              >
-                {voterListLoading
-                  ? "🔄 Memuat..."
-                  : "🔄 Refresh"}
-              </button>
+              <div>
+
+                <button
+                  type="button"
+                  onClick={
+                    loadVoters
+                  }
+                  disabled={
+                    voterListLoading ||
+                    printingAllCards
+                  }
+                >
+                  {voterListLoading
+                    ? "🔄 Memuat..."
+                    : "🔄 Refresh"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    downloadAllVoterCards
+                  }
+                  disabled={
+                    voterListLoading ||
+                    printingAllCards ||
+                    voterList.length ===
+                      0
+                  }
+                >
+                  {printingAllCards
+                    ? "🖨️ Membuat PDF..."
+                    : "🪪 Cetak Semua Kartu A4"}
+                </button>
+
+              </div>
 
             </div>
 
@@ -2807,6 +3015,7 @@ export default function AdminDashboard({
                                 "nowrap",
                             }}
                           >
+
                             {voter.voted_at
                               ? new Date(
                                   voter.voted_at
@@ -2878,7 +3087,8 @@ export default function AdminDashboard({
                 importing ||
                 savingVoters ||
                 candidateLoading ||
-                voterListLoading
+                voterListLoading ||
+                printingAllCards
               }
             >
               ➕ Tambah Kandidat
@@ -2893,7 +3103,7 @@ export default function AdminDashboard({
             </p>
           )}
 
-          {/* FORM KANDIDAT */}
+          {/* FORM TAMBAH / EDIT */}
 
           {showCandidateForm && (
             <div className="candidate-form">
@@ -3005,7 +3215,8 @@ export default function AdminDashboard({
                   event
                 ) =>
                   setCandidateNumber(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Contoh: 1"
@@ -3024,7 +3235,8 @@ export default function AdminDashboard({
                   event
                 ) =>
                   setCandidateName(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Nama lengkap kandidat"
@@ -3043,7 +3255,8 @@ export default function AdminDashboard({
                   event
                 ) =>
                   setCandidateClass(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Contoh: XI.1"
@@ -3061,7 +3274,8 @@ export default function AdminDashboard({
                   event
                 ) =>
                   setCandidateProgram(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Tuliskan program unggulan kandidat..."
@@ -3103,7 +3317,7 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* LOADING KANDIDAT */}
+          {/* LOADING */}
 
           {candidateLoading &&
             !showCandidateForm && (
@@ -3197,7 +3411,8 @@ export default function AdminDashboard({
                             );
                           }}
                           disabled={
-                            candidateLoading
+                            candidateLoading ||
+                            printingAllCards
                           }
                         >
                           ✏️ Edit
@@ -3216,7 +3431,8 @@ export default function AdminDashboard({
                             );
                           }}
                           disabled={
-                            candidateLoading
+                            candidateLoading ||
+                            printingAllCards
                           }
                         >
                           🗑️ Hapus
@@ -3244,7 +3460,7 @@ export default function AdminDashboard({
 
         </div>
 
-        {/* PESAN */}
+        {/* PESAN SISTEM */}
 
         {message && (
           <div className="message">
