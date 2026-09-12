@@ -83,6 +83,9 @@ export default function AdminDashboard({
   const [printingAllCards, setPrintingAllCards] =
     useState(false);
 
+  const [deletingTestVoters, setDeletingTestVoters] =
+    useState(false);
+
   // ====================================================
   // KANDIDAT
   // ====================================================
@@ -471,7 +474,8 @@ export default function AdminDashboard({
 
   function clearPreviewVoters() {
     if (
-      previewVoters.length === 0
+      previewVoters.length ===
+      0
     ) {
       return;
     }
@@ -893,8 +897,7 @@ export default function AdminDashboard({
       );
 
       link.click();
-
-      document.body.removeChild(
+            document.body.removeChild(
         link
       );
 
@@ -917,6 +920,102 @@ export default function AdminDashboard({
       );
     } finally {
       setPrintingAllCards(
+        false
+      );
+    }
+  }
+
+  // ====================================================
+  // HAPUS SEMUA DATA TEST
+  // ====================================================
+
+  async function deleteAllTestVoters() {
+    if (
+      status !== "draft"
+    ) {
+      setMessage(
+        "Data test hanya dapat dihapus saat status DRAFT."
+      );
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "⚠️ HAPUS SEMUA DATA TEST?\n\n" +
+          "Sistem akan mencari semua pemilih dengan NISN yang diawali TEST.\n\n" +
+          "Contoh:\n" +
+          "TEST001\n" +
+          "TEST002\n" +
+          "TEST010\n\n" +
+          "Yang akan dihapus hanya data pemilih test.\n\n" +
+          "Data kandidat TIDAK dihapus.\n" +
+          "Kategori pemilih TIDAK dihapus.\n" +
+          "Akun admin TIDAK dihapus.\n" +
+          "Data pemilihan TIDAK dihapus.\n\n" +
+          "Tindakan ini tidak dapat dibatalkan.\n\n" +
+          "Lanjutkan?"
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const confirmedAgain =
+      window.confirm(
+        "⚠️ KONFIRMASI TERAKHIR\n\n" +
+          "Anda benar-benar ingin menghapus seluruh pemilih dengan NISN TEST*?\n\n" +
+          "Klik OK untuk melanjutkan penghapusan."
+      );
+
+    if (!confirmedAgain) {
+      return;
+    }
+
+    setDeletingTestVoters(
+      true
+    );
+
+    setMessage("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/delete-test-voters",
+          {
+            method: "POST",
+            cache: "no-store",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Gagal menghapus data test."
+        );
+      }
+
+      setMessage(
+        `✅ ${data.message}`
+      );
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } catch (error) {
+      console.error(
+        "Delete test voters error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Terjadi kesalahan saat menghapus data test."
+      );
+    } finally {
+      setDeletingTestVoters(
         false
       );
     }
@@ -948,7 +1047,7 @@ export default function AdminDashboard({
     );
 
   // ====================================================
-  // DOWNLOAD REKAP TOKEN HASIL FINALISASI
+  // DOWNLOAD REKAP TOKEN
   // ====================================================
 
   function downloadSavedTokens() {
@@ -957,7 +1056,8 @@ export default function AdminDashboard({
 
     if (
       !voters ||
-      voters.length === 0
+      voters.length ===
+        0
     ) {
       return;
     }
@@ -1043,7 +1143,8 @@ export default function AdminDashboard({
 
     if (
       !voters ||
-      voters.length === 0
+      voters.length ===
+        0
     ) {
       setMessage(
         "Belum ada token hasil finalisasi yang dapat dibuat menjadi kartu."
@@ -1147,7 +1248,8 @@ export default function AdminDashboard({
               rowsPerPage);
 
           if (
-            indexInPage === 0
+            indexInPage ===
+            0
           ) {
             pdfDoc.addPage([
               pageWidth,
@@ -1257,7 +1359,8 @@ export default function AdminDashboard({
             "NAMA",
             {
               x: left,
-              y: identityY,
+              y:
+                identityY,
               size: 6.5,
               font:
                 fontBold,
@@ -1266,7 +1369,8 @@ export default function AdminDashboard({
             }
           );
 
-          identityY -= 12;
+          identityY -=
+            12;
 
           page.drawText(
             String(
@@ -1275,7 +1379,8 @@ export default function AdminDashboard({
             ),
             {
               x: left,
-              y: identityY,
+              y:
+                identityY,
               size: 8.8,
               font:
                 fontBold,
@@ -1284,13 +1389,15 @@ export default function AdminDashboard({
             }
           );
 
-          identityY -= 19;
+          identityY -=
+            19;
 
           page.drawText(
             "NISN",
             {
               x: left,
-              y: identityY,
+              y:
+                identityY,
               size: 6.5,
               font:
                 fontBold,
@@ -1299,7 +1406,8 @@ export default function AdminDashboard({
             }
           );
 
-          identityY -= 12;
+          identityY -=
+            12;
 
           page.drawText(
             String(
@@ -1308,7 +1416,8 @@ export default function AdminDashboard({
             ),
             {
               x: left,
-              y: identityY,
+              y:
+                identityY,
               size: 8.5,
               font:
                 fontRegular,
@@ -1337,7 +1446,8 @@ export default function AdminDashboard({
               light,
             borderColor:
               border,
-            borderWidth: 0.8,
+            borderWidth:
+              0.8,
           });
 
           page.drawText(
@@ -1364,7 +1474,8 @@ export default function AdminDashboard({
             ).trim();
 
           const tokenSize =
-            token.length > 10
+            token.length >
+            10
               ? 14
               : 16;
 
@@ -1400,7 +1511,8 @@ export default function AdminDashboard({
             "Gunakan token ini satu kali untuk memberikan suara.",
             {
               x: left,
-              y: y + 13,
+              y:
+                y + 13,
               size: 5.5,
               font:
                 fontRegular,
@@ -1540,14 +1652,30 @@ export default function AdminDashboard({
   // ====================================================
 
   function resetCandidateForm() {
-    setCandidateNumber("");
-    setCandidateName("");
-    setCandidateClass("");
-    setCandidateProgram("");
-    setCandidatePhoto(null);
+    setCandidateNumber(
+      ""
+    );
+
+    setCandidateName(
+      ""
+    );
+
+    setCandidateClass(
+      ""
+    );
+
+    setCandidateProgram(
+      ""
+    );
+
+    setCandidatePhoto(
+      null
+    );
+
     setCandidatePhotoPreview(
       null
     );
+
     setRemoveExistingPhoto(
       false
     );
@@ -1704,7 +1832,9 @@ export default function AdminDashboard({
   // ====================================================
 
   async function saveCandidate() {
-    if (status !== "draft") {
+    if (
+      status !== "draft"
+    ) {
       setMessage(
         "Kandidat hanya dapat dikelola saat status DRAFT."
       );
@@ -1769,7 +1899,9 @@ export default function AdminDashboard({
         candidateProgram
       );
 
-      if (candidatePhoto) {
+      if (
+        candidatePhoto
+      ) {
         formData.append(
           "photo",
           candidatePhoto
@@ -1795,8 +1927,10 @@ export default function AdminDashboard({
           await fetch(
             "/api/candidates",
             {
-              method: "PUT",
-              body: formData,
+              method:
+                "PUT",
+              body:
+                formData,
             }
           );
       } else {
@@ -1804,8 +1938,10 @@ export default function AdminDashboard({
           await fetch(
             "/api/candidates",
             {
-              method: "POST",
-              body: formData,
+              method:
+                "POST",
+              body:
+                formData,
             }
           );
       }
@@ -1853,7 +1989,9 @@ export default function AdminDashboard({
   async function deleteCandidate(
     candidate
   ) {
-    if (status !== "draft") {
+    if (
+      status !== "draft"
+    ) {
       setMessage(
         "Kandidat hanya dapat dihapus saat status DRAFT."
       );
@@ -1883,15 +2021,17 @@ export default function AdminDashboard({
         await fetch(
           "/api/candidates",
           {
-            method: "DELETE",
+            method:
+              "DELETE",
             headers: {
               "Content-Type":
                 "application/json",
             },
-            body: JSON.stringify({
-              candidateId:
-                candidate.id,
-            }),
+            body:
+              JSON.stringify({
+                candidateId:
+                  candidate.id,
+              }),
           }
         );
 
@@ -2045,7 +2185,8 @@ export default function AdminDashboard({
               savingVoters ||
               candidateLoading ||
               voterListLoading ||
-              printingAllCards
+              printingAllCards ||
+              deletingTestVoters
             }
           >
             {loading
@@ -2068,7 +2209,8 @@ export default function AdminDashboard({
                 savingVoters ||
                 candidateLoading ||
                 voterListLoading ||
-                printingAllCards
+                printingAllCards ||
+                deletingTestVoters
               }
             >
               {loading
@@ -2092,7 +2234,8 @@ export default function AdminDashboard({
                 savingVoters ||
                 candidateLoading ||
                 voterListLoading ||
-                printingAllCards
+                printingAllCards ||
+                deletingTestVoters
               }
             >
               {loading
@@ -2169,7 +2312,8 @@ export default function AdminDashboard({
               importing ||
               savingVoters ||
               loading ||
-              status !== "draft"
+              status !== "draft" ||
+              deletingTestVoters
             }
           />
 
@@ -2182,13 +2326,51 @@ export default function AdminDashboard({
               importing ||
               savingVoters ||
               loading ||
-              status !== "draft"
+              status !== "draft" ||
+              deletingTestVoters
             }
           >
             {importing
               ? "📥 Membaca Excel..."
               : "📥 Import / Preview Excel"}
           </button>
+
+          {/* HAPUS DATA TEST */}
+
+          {status ===
+            "draft" && (
+            <>
+              <button
+                type="button"
+                onClick={
+                  deleteAllTestVoters
+                }
+                disabled={
+                  deletingTestVoters ||
+                  importing ||
+                  savingVoters ||
+                  loading ||
+                  candidateLoading ||
+                  voterListLoading ||
+                  printingAllCards
+                }
+              >
+                {deletingTestVoters
+                  ? "🧹 Menghapus Data Test..."
+                  : "🧹 Hapus Semua Data Test"}
+              </button>
+
+              <p className="closed-message">
+                Tombol ini khusus untuk
+                pengujian. Hanya pemilih
+                dengan NISN yang diawali{" "}
+                <strong>
+                  TEST
+                </strong>{" "}
+                yang akan dihapus.
+              </p>
+            </>
+          )}
 
           {status !==
             "draft" && (
@@ -2596,57 +2778,57 @@ export default function AdminDashboard({
             savedVotersResult
               .voters.length >
               0 && (
-              <div className="import-result">
+            <div className="import-result">
 
-                <h3>
-                  ✅ Pemilih Berhasil
-                  Disimpan
-                </h3>
+              <h3>
+                ✅ Pemilih Berhasil
+                Disimpan
+              </h3>
 
-                <p>
-                  {
-                    savedVotersResult.saved
-                  }{" "}
-                  pemilih berhasil
-                  disimpan.
-                </p>
+              <p>
+                {
+                  savedVotersResult.saved
+                }{" "}
+                pemilih berhasil
+                disimpan.
+              </p>
 
-                <button
-                  type="button"
-                  onClick={
-                    downloadSavedTokens
-                  }
-                >
-                  📄 Download Rekap
-                  Token
-                </button>
+              <button
+                type="button"
+                onClick={
+                  downloadSavedTokens
+                }
+              >
+                📄 Download Rekap
+                Token
+              </button>
 
-                <button
-                  type="button"
-                  onClick={
-                    downloadSavedVoterCards
-                  }
-                >
-                  🪪 Download Kartu
-                  Batch Ini
-                </button>
+              <button
+                type="button"
+                onClick={
+                  downloadSavedVoterCards
+                }
+              >
+                🪪 Download Kartu
+                Batch Ini
+              </button>
 
-                <p className="subtitle">
-                  Kartu batch ini hanya
-                  digunakan sebagai hasil
-                  finalisasi saat ini.
-                  Untuk mencetak seluruh
-                  pemilih yang tersimpan,
-                  gunakan tombol
-                  <strong>
-                    {" "}
-                    Cetak Semua Kartu
-                  </strong>{" "}
-                  di bagian Daftar Pemilih.
-                </p>
+              <p className="subtitle">
+                Kartu batch ini hanya
+                digunakan sebagai hasil
+                finalisasi saat ini.
+                Untuk mencetak seluruh
+                pemilih yang tersimpan,
+                gunakan tombol
+                <strong>
+                  {" "}
+                  Cetak Semua Kartu
+                </strong>{" "}
+                di bagian Daftar Pemilih.
+              </p>
 
-              </div>
-            )}
+            </div>
+          )}
 
           {/* =================================================
               DAFTAR PEMILIH TERSIMPAN
@@ -2705,7 +2887,8 @@ export default function AdminDashboard({
                   }
                   disabled={
                     voterListLoading ||
-                    printingAllCards
+                    printingAllCards ||
+                    deletingTestVoters
                   }
                 >
                   {voterListLoading
@@ -2721,6 +2904,7 @@ export default function AdminDashboard({
                   disabled={
                     voterListLoading ||
                     printingAllCards ||
+                    deletingTestVoters ||
                     voterList.length ===
                       0
                   }
@@ -3060,7 +3244,6 @@ export default function AdminDashboard({
           </div>
 
         </div>
-
         {/* ==================================================
             DATA KANDIDAT
         ================================================== */}
@@ -3088,7 +3271,8 @@ export default function AdminDashboard({
                 savingVoters ||
                 candidateLoading ||
                 voterListLoading ||
-                printingAllCards
+                printingAllCards ||
+                deletingTestVoters
               }
             >
               ➕ Tambah Kandidat
@@ -3412,7 +3596,8 @@ export default function AdminDashboard({
                           }}
                           disabled={
                             candidateLoading ||
-                            printingAllCards
+                            printingAllCards ||
+                            deletingTestVoters
                           }
                         >
                           ✏️ Edit
@@ -3432,7 +3617,8 @@ export default function AdminDashboard({
                           }}
                           disabled={
                             candidateLoading ||
-                            printingAllCards
+                            printingAllCards ||
+                            deletingTestVoters
                           }
                         >
                           🗑️ Hapus
@@ -3467,7 +3653,6 @@ export default function AdminDashboard({
             {message}
           </div>
         )}
-
       </section>
     </main>
   );
