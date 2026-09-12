@@ -8,7 +8,7 @@ const ELECTION_NAME =
   "Pemilihan Ketua KIR Nebula Periode 2026/2027";
 
 // ======================================================
-// CEK ADMIN LOGIN
+// CEK ADMIN
 // ======================================================
 
 async function getAdminUser() {
@@ -40,7 +40,8 @@ async function getAdminUser() {
                 }
               );
             } catch {
-              // Tidak masalah jika cookie tidak dapat ditulis.
+              // Tidak selalu bisa menulis cookie
+              // dari Route Handler.
             }
           },
         },
@@ -68,7 +69,7 @@ async function getAdminUser() {
 }
 
 // ======================================================
-// SUPABASE SERVER
+// SUPABASE SERVER CLIENT
 // ======================================================
 
 function createServerSupabase() {
@@ -85,10 +86,15 @@ function createServerSupabase() {
 }
 
 // ======================================================
-// GENERATE TOKEN
+// TOKEN
 // ======================================================
 
 function generateToken() {
+  /*
+   * 10 digit HEX = 40 bit.
+   * Contoh:
+   * A7F92C18B4
+   */
   return crypto
     .randomBytes(5)
     .toString("hex")
@@ -104,6 +110,118 @@ function hashToken(token) {
     .createHash("sha256")
     .update(token.trim())
     .digest("hex");
+}
+
+// ======================================================
+// ENCRYPT TOKEN
+//
+// TOKEN_ENCRYPTION_KEY harus berupa 64 karakter HEX
+// = 32 byte = AES-256.
+//
+// Format penyimpanan:
+// iv:authTag:ciphertext
+// ======================================================
+
+function getEncryptionKey() {
+  const keyHex =
+    process.env.TOKEN_ENCRYPTION_KEY;
+
+  if (!keyHex) {
+    throw new Error(
+      "TOKEN_ENCRYPTION_KEY belum tersedia di server."
+    );
+  }
+
+  if (
+    !/^[0-9a-fA-F]{64}$/.test(
+      keyHex
+    )
+  ) {
+    throw new Error(
+      "TOKEN_ENCRYPTION_KEY harus berupa 64 karakter hexadecimal."
+    );
+  }
+
+  return Buffer.from(
+    keyHex,
+    "hex"
+  );
+}
+
+function encryptToken(token) {
+  const key =
+    getEncryptionKey();
+
+  /*
+   * IV 12 byte adalah ukuran yang umum
+   * untuk AES-GCM.
+   */
+  const iv =
+    crypto.randomBytes(12);
+
+  const cipher =
+    crypto.createCipheriv(
+      "aes-256-gcm",
+      key,
+      iv
+    );
+
+  const encrypted = Buffer.concat([
+    cipher.update(
+      token,
+      "utf8"
+    ),
+    cipher.final(),
+  ]);
+
+  const authTag =
+    cipher.getAuthTag();
+
+  return [
+    iv.toString("hex"),
+    authTag.toString("hex"),
+    encrypted.toString("hex"),
+  ].join(":");
+}
+
+// ======================================================
+// VALIDASI KATEGORI
+// ======================================================
+
+async function getCategoryMap(
+  supabase
+) {
+  const {
+    data: categories,
+    error,
+  } =
+    await supabase
+      .from("voter_categories")
+      .select(
+        "id, name, weight"
+      );
+
+  if (error) {
+    throw new Error(
+      "Gagal membaca kategori pemilih."
+    );
+  }
+
+  const map = new Map();
+
+  for (
+    const category of
+      categories || []
+  ) {
+    map.set(
+      category.name
+        .trim()
+        .toLowerCase(),
+      category
+    );
+  }
+
+  return map;
 }
 
 // ======================================================
@@ -134,14 +252,20 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 2. SUPABASE SERVER
+    // 2. VALIDASI ENV
+    // --------------------------------------------------
+
+    getEncryptionKey();
+
+    // --------------------------------------------------
+    // 3. SUPABASE SERVER
     // --------------------------------------------------
 
     const supabase =
       createServerSupabase();
 
     // --------------------------------------------------
-    // 3. AMBIL ELECTION
+    // 4. AMBIL ELECTION
     // --------------------------------------------------
 
     const {
@@ -174,7 +298,7 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 4. WAJIB DRAFT
+    // 5. HARUS DRAFT
     // --------------------------------------------------
 
     if (
@@ -185,14 +309,14 @@ export async function POST(
         {
           success: false,
           message:
-            "Pemilih hanya dapat disimpan saat status pemilihan DRAFT.",
+            "Data pemilih hanya dapat difinalisasi saat status DRAFT.",
         },
         { status: 400 }
       );
     }
 
     // --------------------------------------------------
-    // 5. AMBIL DATA DARI PREVIEW
+    // 6. AMBIL BODY
     // --------------------------------------------------
 
     const body =
@@ -216,7 +340,7 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 6. BATASI JUMLAH DATA
+    // 7. BATAS MAKSIMUM
     // --------------------------------------------------
 
     if (
@@ -233,64 +357,25 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 7. AMBIL KATEGORI TERBARU DARI DATABASE
-    //
-    // Kita tidak sepenuhnya percaya category_id
-    // dari browser. Server akan memvalidasinya lagi.
+    // 8. AMBIL KATEGORI DARI DATABASE
     // --------------------------------------------------
-
-    const {
-      data: categories,
-      error: categoryError,
-    } =
-      await supabase
-        .from("voter_categories")
-        .select(
-          "id, name, weight"
-        );
-
-    if (categoryError) {
-      console.error(
-        "Category error:",
-        categoryError
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Gagal membaca kategori pemilih.",
-        },
-        { status: 500 }
-      );
-    }
 
     const categoryMap =
-      new Map();
-
-    for (
-      const category of
-        categories || []
-    ) {
-      categoryMap.set(
-        category.name
-          .trim()
-          .toLowerCase(),
-        category
+      await getCategoryMap(
+        supabase
       );
-    }
 
     // --------------------------------------------------
-    // 8. VALIDASI DATA PREVIEW
+    // 9. VALIDASI PREVIEW
     // --------------------------------------------------
 
     const normalizedVoters =
       [];
 
-    const errors = [];
-
     const usedNisn =
       new Set();
+
+    const errors = [];
 
     for (
       let i = 0;
@@ -321,6 +406,10 @@ export async function POST(
             ""
         ).trim();
 
+      // ------------------------------
+      // NISN
+      // ------------------------------
+
       if (!nisn) {
         errors.push(
           `Baris ${rowNumber}: NISN kosong.`
@@ -328,12 +417,20 @@ export async function POST(
         continue;
       }
 
+      // ------------------------------
+      // Nama
+      // ------------------------------
+
       if (!nama) {
         errors.push(
           `Baris ${rowNumber}: Nama kosong.`
         );
         continue;
       }
+
+      // ------------------------------
+      // Kategori
+      // ------------------------------
 
       if (!kategori) {
         errors.push(
@@ -349,17 +446,21 @@ export async function POST(
 
       if (!category) {
         errors.push(
-          `Baris ${rowNumber}: Kategori "${kategori}" tidak dikenali.`
+          `Baris ${rowNumber}: Kategori "${kategori}" tidak ditemukan.`
         );
         continue;
       }
 
-      const normalizedKey =
+      // ------------------------------
+      // Duplikasi NISN dalam batch
+      // ------------------------------
+
+      const normalizedNisn =
         nisn.toLowerCase();
 
       if (
         usedNisn.has(
-          normalizedKey
+          normalizedNisn
         )
       ) {
         errors.push(
@@ -369,7 +470,7 @@ export async function POST(
       }
 
       usedNisn.add(
-        normalizedKey
+        normalizedNisn
       );
 
       normalizedVoters.push({
@@ -397,7 +498,7 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 9. CEK NISN YANG SUDAH TERDAFTAR
+    // 10. CEK NISN YANG SUDAH ADA
     // --------------------------------------------------
 
     const nisnList =
@@ -451,7 +552,7 @@ export async function POST(
         {
           success: false,
           message:
-            "Ada NISN yang sudah terdaftar. Periksa kembali data sebelum disimpan.",
+            "Ada NISN yang sudah terdaftar. Data tersebut tidak boleh disimpan ulang.",
           existing:
             existingVoters.map(
               (voter) =>
@@ -463,7 +564,7 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 10. BUAT TOKEN
+    // 11. SIAPKAN TOKEN
     // --------------------------------------------------
 
     const tokenResults =
@@ -472,18 +573,65 @@ export async function POST(
     const insertData =
       [];
 
-    const usedTokenHashes =
+    const generatedTokenHashes =
       new Set();
+
+    /*
+     * Kita ambil hash token yang sudah ada
+     * supaya token baru tidak bertabrakan.
+     *
+     * Kemungkinan collision sangat kecil,
+     * tetapi kita tetap menangani secara eksplisit.
+     */
+
+    const {
+      data: existingTokenRows,
+      error: tokenQueryError,
+    } =
+      await supabase
+        .from("voters")
+        .select(
+          "token_hash"
+        )
+        .eq(
+          "election_id",
+          election.id
+        );
+
+    if (
+      tokenQueryError
+    ) {
+      console.error(
+        "Existing token query error:",
+        tokenQueryError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Gagal memeriksa token yang sudah ada.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const existingTokenHashes =
+      new Set(
+        (existingTokenRows || [])
+          .map(
+            (row) =>
+              row.token_hash
+          )
+      );
 
     for (
       const voter of
         normalizedVoters
     ) {
-      let token = "";
-      let tokenHash = "";
+      let token;
+      let tokenHash;
 
-      // Pastikan token unik dalam batch
-      // dan secara praktis tidak bertabrakan.
       do {
         token =
           generateToken();
@@ -493,14 +641,30 @@ export async function POST(
             token
           );
       } while (
-        usedTokenHashes.has(
+        existingTokenHashes.has(
+          tokenHash
+        ) ||
+        generatedTokenHashes.has(
           tokenHash
         )
       );
 
-      usedTokenHashes.add(
+      generatedTokenHashes.add(
         tokenHash
       );
+
+      // ----------------------------------------------
+      // ENKRIPSI TOKEN
+      // ----------------------------------------------
+
+      const tokenEncrypted =
+        encryptToken(
+          token
+        );
+
+      // ----------------------------------------------
+      // DATA DATABASE
+      // ----------------------------------------------
 
       insertData.push({
         election_id:
@@ -518,9 +682,20 @@ export async function POST(
         token_hash:
           tokenHash,
 
+        token_encrypted:
+          tokenEncrypted,
+
         has_voted:
           false,
+
+        voted_at:
+          null,
       });
+
+      // ----------------------------------------------
+      // HASIL UNTUK ADMIN
+      // Token plaintext hanya keluar sekarang.
+      // ----------------------------------------------
 
       tokenResults.push({
         nisn:
@@ -537,10 +712,7 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 11. SIMPAN SEMUA SEKALIGUS
-    //
-    // Supabase melakukan satu operasi INSERT.
-    // Jika gagal, data tidak dianggap berhasil.
+    // 12. INSERT SEMUA PEMILIH
     // --------------------------------------------------
 
     const {
@@ -576,7 +748,7 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 12. AUDIT LOG
+    // 13. AUDIT LOG
     // --------------------------------------------------
 
     const {
@@ -601,7 +773,9 @@ export async function POST(
           },
         });
 
-    if (auditError) {
+    if (
+      auditError
+    ) {
       console.error(
         "Audit log warning:",
         auditError
@@ -609,17 +783,14 @@ export async function POST(
     }
 
     // --------------------------------------------------
-    // 13. RESPONSE
-    //
-    // Token plaintext hanya dikembalikan sekarang.
-    // Database tetap hanya menyimpan hash.
+    // 14. RESPONSE
     // --------------------------------------------------
 
     return NextResponse.json({
       success: true,
 
       message:
-        "Data pemilih berhasil disimpan dan token berhasil dibuat.",
+        "Data pemilih berhasil disimpan dan token tetap berhasil dibuat.",
 
       saved:
         insertedVoters?.length ||
@@ -638,6 +809,7 @@ export async function POST(
       {
         success: false,
         message:
+          error.message ||
           "Terjadi kesalahan saat menyimpan data pemilih.",
       },
       { status: 500 }
