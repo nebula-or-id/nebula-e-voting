@@ -86,6 +86,12 @@ export default function AdminDashboard({
   const [deletingTestVoters, setDeletingTestVoters] =
     useState(false);
 
+  const [results, setResults] =
+  useState(null);
+
+const [resultsLoading, setResultsLoading] =
+  useState(false);
+  
   // ====================================================
   // KANDIDAT
   // ====================================================
@@ -130,10 +136,11 @@ export default function AdminDashboard({
   // LOAD AWAL
   // ====================================================
 
-  useEffect(() => {
-    loadCandidates();
-    loadVoters();
-  }, []);
+useEffect(() => {
+  loadCandidates();
+  loadVoters();
+  loadResults();
+}, []);
 
   // ====================================================
   // STATUS PEMILIHAN
