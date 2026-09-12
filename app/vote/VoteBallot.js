@@ -63,8 +63,12 @@ export default function VoteBallot({ candidates }) {
       }
 
       setSuccess(true);
-
     } catch (error) {
+      console.error(
+        "Submit vote error:",
+        error
+      );
+
       setErrorMessage(
         "Tidak dapat terhubung ke server."
       );
@@ -106,26 +110,105 @@ export default function VoteBallot({ candidates }) {
         <h2>Konfirmasi Pilihan</h2>
 
         <p>
-          Pastikan urutan pilihan Anda sudah benar.
+          Pastikan urutan pilihan Anda sudah benar
+          sebelum mengirim suara.
         </p>
 
-        <div style={{ marginTop: "20px" }}>
+        <div
+          style={{
+            marginTop: "20px",
+          }}
+        >
           {items.map((candidate, index) => (
             <div
               key={candidate.id}
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
                 padding: "14px",
                 marginBottom: "10px",
                 border: "1px solid #e2e8f0",
                 borderRadius: "12px",
+                background: "#ffffff",
               }}
             >
-              <strong>
-                Peringkat {index + 1}
-              </strong>
+              <div
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  minWidth: "34px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "50%",
+                  background: "#eef2ff",
+                  fontWeight: "700",
+                }}
+              >
+                {index + 1}
+              </div>
+
+              {candidate.photo_url ? (
+                <img
+                  src={candidate.photo_url}
+                  alt={`Foto ${candidate.name}`}
+                  style={{
+                    width: "58px",
+                    height: "76px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                    border: "1px solid #d0d5dd",
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "58px",
+                    height: "76px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "8px",
+                    border: "1px solid #d0d5dd",
+                    background: "#f8fafc",
+                    color: "#98a2b3",
+                    fontSize: "11px",
+                    textAlign: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  Foto
+                  <br />
+                  belum ada
+                </div>
+              )}
 
               <div>
-                {candidate.name}
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#667085",
+                    marginBottom: "3px",
+                  }}
+                >
+                  Peringkat {index + 1}
+                </div>
+
+                <strong>
+                  {candidate.name}
+                </strong>
+
+                <div
+                  style={{
+                    color: "#667085",
+                    marginTop: "4px",
+                    fontSize: "13px",
+                  }}
+                >
+                  {candidate.class_name}
+                </div>
               </div>
             </div>
           ))}
@@ -134,7 +217,9 @@ export default function VoteBallot({ candidates }) {
         {errorMessage && (
           <div
             className="info"
-            style={{ marginTop: "16px" }}
+            style={{
+              marginTop: "16px",
+            }}
           >
             <p>{errorMessage}</p>
           </div>
@@ -180,7 +265,11 @@ export default function VoteBallot({ candidates }) {
         pilihan pertama hingga terakhir.
       </p>
 
-      <div style={{ marginTop: "24px" }}>
+      <div
+        style={{
+          marginTop: "24px",
+        }}
+      >
         {items.map((candidate, index) => (
           <div
             key={candidate.id}
@@ -196,7 +285,7 @@ export default function VoteBallot({ candidates }) {
               display: "flex",
               alignItems: "center",
               gap: "14px",
-              padding: "16px",
+              padding: "14px",
               marginBottom: "12px",
               border: "1px solid #d0d5dd",
               borderRadius: "14px",
@@ -204,10 +293,12 @@ export default function VoteBallot({ candidates }) {
               background: "white",
             }}
           >
+            {/* NOMOR RANKING */}
             <div
               style={{
                 width: "36px",
                 height: "36px",
+                minWidth: "36px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -219,7 +310,60 @@ export default function VoteBallot({ candidates }) {
               {index + 1}
             </div>
 
-            <div style={{ flex: 1 }}>
+            {/* FOTO KANDIDAT */}
+            {candidate.photo_url ? (
+              <img
+                src={candidate.photo_url}
+                alt={`Foto ${candidate.name}`}
+                style={{
+                  width: "64px",
+                  height: "84px",
+                  objectFit: "cover",
+                  borderRadius: "8px",
+                  border: "1px solid #d0d5dd",
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "64px",
+                  height: "84px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "8px",
+                  border: "1px solid #d0d5dd",
+                  background: "#f8fafc",
+                  color: "#98a2b3",
+                  fontSize: "11px",
+                  textAlign: "center",
+                  flexShrink: 0,
+                }}
+              >
+                Foto
+                <br />
+                belum ada
+              </div>
+            )}
+
+            {/* INFORMASI KANDIDAT */}
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#667085",
+                  marginBottom: "3px",
+                }}
+              >
+                Kandidat {candidate.candidate_number}
+              </div>
+
               <strong>
                 {candidate.name}
               </strong>
@@ -228,16 +372,32 @@ export default function VoteBallot({ candidates }) {
                 style={{
                   color: "#667085",
                   marginTop: "4px",
+                  fontSize: "13px",
                 }}
               >
                 {candidate.class_name}
               </div>
+
+              {candidate.vision && (
+                <div
+                  style={{
+                    color: "#667085",
+                    marginTop: "6px",
+                    fontSize: "12px",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  {candidate.vision}
+                </div>
+              )}
             </div>
 
+            {/* HANDLE DRAG */}
             <div
               style={{
                 fontSize: "20px",
                 color: "#98a2b3",
+                userSelect: "none",
               }}
             >
               ⋮⋮
@@ -249,7 +409,9 @@ export default function VoteBallot({ candidates }) {
       {errorMessage && (
         <div
           className="info"
-          style={{ marginTop: "16px" }}
+          style={{
+            marginTop: "16px",
+          }}
         >
           <p>{errorMessage}</p>
         </div>
