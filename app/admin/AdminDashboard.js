@@ -3295,6 +3295,301 @@ const response =
 
         </div>
         {/* ==================================================
+            HASIL PEMILIHAN
+        ================================================== */}
+
+        <div className="admin-actions">
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <h2>
+                📊 Hasil Pemilihan
+              </h2>
+
+              <p className="subtitle">
+                Rekapitulasi berdasarkan metode Weighted Borda Count.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadResults}
+              disabled={
+                resultsLoading ||
+                loading ||
+                printingAllCards ||
+                deletingTestVoters
+              }
+            >
+              {resultsLoading
+                ? "🔄 Memuat..."
+                : "🔄 Refresh Hasil"}
+            </button>
+          </div>
+
+          {resultsLoading && !results && (
+            <div
+              className="info"
+              style={{
+                marginTop: "16px",
+              }}
+            >
+              Sedang mengambil hasil pemilihan...
+            </div>
+          )}
+
+          {results &&
+            results.totalBallots === 0 && (
+              <div
+                className="info"
+                style={{
+                  marginTop: "16px",
+                }}
+              >
+                Belum ada ballot yang masuk.
+              </div>
+            )}
+
+          {results &&
+            results.totalBallots > 0 && (
+              <div
+                style={{
+                  marginTop: "20px",
+                }}
+              >
+
+                <div
+                  className="info"
+                  style={{
+                    marginBottom: "16px",
+                  }}
+                >
+                  <strong>
+                    Total Ballot:
+                  </strong>{" "}
+                  {results.totalBallots}
+                  <br />
+
+                  <strong>
+                    Metode:
+                  </strong>{" "}
+                  Weighted Borda Count
+                  <br />
+
+                  <strong>
+                    Jumlah Kandidat:
+                  </strong>{" "}
+                  {results.candidateCount}
+                </div>
+
+                {results.candidates.map(
+                  (candidate) => (
+                    <div
+                      key={candidate.candidateId}
+                      style={{
+                        border:
+                          candidate.isWinner
+                            ? "2px solid #111827"
+                            : "1px solid #d0d5dd",
+                        borderRadius:
+                          "12px",
+                        padding:
+                          "16px",
+                        marginBottom:
+                          "12px",
+                        background:
+                          candidate.isWinner
+                            ? "#f8fafc"
+                            : "#fff",
+                      }}
+                    >
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent:
+                            "space-between",
+                          alignItems:
+                            "center",
+                          gap: "12px",
+                        }}
+                      >
+
+                        <div>
+                          <div
+                            style={{
+                              fontSize:
+                                "13px",
+                              fontWeight:
+                                "700",
+                            }}
+                          >
+                            {candidate.isWinner
+                              ? "🥇 PEMENANG"
+                              : `Peringkat ${candidate.rank}`}
+                          </div>
+
+                          <h3
+                            style={{
+                              margin:
+                                "6px 0",
+                            }}
+                          >
+                            Kandidat{" "}
+                            {
+                              candidate.candidateNumber
+                            }{" "}
+                            ·{" "}
+                            {candidate.name}
+                          </h3>
+
+                          <p
+                            style={{
+                              margin: "0",
+                            }}
+                          >
+                            Kelas:{" "}
+                            {candidate.className ||
+                              "-"}
+                          </p>
+                        </div>
+
+                        <div
+                          style={{
+                            textAlign:
+                              "right",
+                            minWidth:
+                              "130px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize:
+                                "12px",
+                              opacity:
+                                "0.7",
+                            }}
+                          >
+                            Weighted Borda
+                          </div>
+
+                          <strong
+                            style={{
+                              fontSize:
+                                "28px",
+                            }}
+                          >
+                            {
+                              candidate.weightedBordaScore
+                            }
+                          </strong>
+                        </div>
+
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop:
+                            "14px",
+                          paddingTop:
+                            "12px",
+                          borderTop:
+                            "1px solid #e5e7eb",
+                        }}
+                      >
+                        <strong>
+                          Distribusi Ranking
+                        </strong>
+
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            flexWrap:
+                              "wrap",
+                            gap: "8px",
+                            marginTop:
+                              "8px",
+                          }}
+                        >
+                          {Array.from(
+                            {
+                              length:
+                                results.candidateCount,
+                            },
+                            (_, index) => {
+                              const rank =
+                                index + 1;
+
+                              return (
+                                <span
+                                  key={rank}
+                                  style={{
+                                    padding:
+                                      "6px 10px",
+                                    border:
+                                      "1px solid #d0d5dd",
+                                    borderRadius:
+                                      "999px",
+                                    fontSize:
+                                      "12px",
+                                  }}
+                                >
+                                  Rank {rank}:{" "}
+                                  {
+                                    candidate
+                                      .rankCounts?.[
+                                      rank
+                                    ] || 0
+                                  }
+                                </span>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop:
+                            "12px",
+                          fontSize:
+                            "13px",
+                        }}
+                      >
+                        Borda Murni:{" "}
+                        <strong>
+                          {
+                            candidate.bordaScore
+                          }
+                        </strong>
+                        {" • "}
+                        Weighted Borda:{" "}
+                        <strong>
+                          {
+                            candidate.weightedBordaScore
+                          }
+                        </strong>
+                      </div>
+
+                    </div>
+                  )
+                )}
+
+              </div>
+            )}
+
+        </div>
+
+        {/* ==================================================
             DATA KANDIDAT
         ================================================== */}
 
