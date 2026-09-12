@@ -978,14 +978,14 @@ export default function AdminDashboard({
     setMessage("");
 
     try {
-      const response =
-        await fetch(
-          "/api/delete-test-voters",
-          {
-            method: "POST",
-            cache: "no-store",
-          }
-        );
+const response =
+  await fetch(
+    "/api/delete-test-voters",
+    {
+      method: "DELETE",
+      cache: "no-store",
+    }
+  );
 
       const data =
         await response.json();
