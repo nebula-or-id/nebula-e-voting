@@ -793,6 +793,49 @@ useEffect(() => {
     }
   }
 
+    // ====================================================
+  // LOAD HASIL WEIGHTED BORDA
+  // ====================================================
+
+  async function loadResults() {
+    setResultsLoading(true);
+
+    try {
+      const response =
+        await fetch(
+          "/api/admin/election-results",
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Gagal mengambil hasil pemilihan."
+        );
+      }
+
+      setResults(data);
+    } catch (error) {
+      console.error(
+        "Load results error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Gagal mengambil hasil pemilihan."
+      );
+    } finally {
+      setResultsLoading(false);
+    }
+  }
+  
   // ====================================================
   // CETAK SEMUA KARTU
   // ====================================================
