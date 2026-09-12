@@ -57,6 +57,10 @@ async function requireAdmin() {
 
 export async function POST() {
   try {
+    // ====================================================
+    // CEK ADMIN
+    // ====================================================
+
     const auth = await requireAdmin();
 
     if (!auth.authorized) {
@@ -64,20 +68,25 @@ export async function POST() {
     }
 
     // ====================================================
-    // CARI PEMILIHAN AKTIF
+    // CARI PEMILIHAN
     // ====================================================
 
     const { data: election, error: electionError } =
       await supabaseAdmin
         .from("elections")
-        .select("id, name, status")
+        .select(
+          "id, name, status"
+        )
         .eq(
           "name",
           "Pemilihan Ketua KIR Nebula Periode 2026/2027"
         )
         .single();
 
-    if (electionError || !election) {
+    if (
+      electionError ||
+      !election
+    ) {
       console.error(
         "Delete test voters election error:",
         electionError
@@ -86,7 +95,8 @@ export async function POST() {
       return NextResponse.json(
         {
           success: false,
-          message: "Data pemilihan tidak ditemukan.",
+          message:
+            "Data pemilihan tidak ditemukan.",
         },
         { status: 404 }
       );
@@ -96,7 +106,10 @@ export async function POST() {
     // WAJIB DRAFT
     // ====================================================
 
-    if (election.status !== "draft") {
+    if (
+      election.status !==
+      "draft"
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -109,18 +122,25 @@ export async function POST() {
 
     // ====================================================
     // AMBIL VOTER TEST
-    //
-    // Hanya NISN/voter_code yang diawali TEST
+    // HANYA voter_code DIAWALI TEST
     // ====================================================
 
-    const { data: testVoters, error: voterFetchError } =
-      await supabaseAdmin
-        .from("voters")
-        .select(
-          "id, voter_code, full_name"
-        )
-        .eq("election_id", election.id)
-        .ilike("voter_code", "TEST%");
+    const {
+      data: testVoters,
+      error: voterFetchError,
+    } = await supabaseAdmin
+      .from("voters")
+      .select(
+        "id, voter_code, full_name"
+      )
+      .eq(
+        "election_id",
+        election.id
+      )
+      .ilike(
+        "voter_code",
+        "TEST%"
+      );
 
     if (voterFetchError) {
       console.error(
@@ -139,7 +159,7 @@ export async function POST() {
     }
 
     // ====================================================
-    // TIDAK ADA DATA
+    // TIDAK ADA DATA TEST
     // ====================================================
 
     if (
@@ -149,6 +169,7 @@ export async function POST() {
       return NextResponse.json({
         success: true,
         deleted: 0,
+        deleted_voters: [],
         message:
           "Tidak ada data pemilih test yang ditemukan.",
       });
@@ -160,17 +181,18 @@ export async function POST() {
       );
 
     // ====================================================
-    // HAPUS VOTING SESSIONS MILIK TEST VOTER
+    // HAPUS SESSION TEST
     // ====================================================
 
-    const { error: sessionDeleteError } =
-      await supabaseAdmin
-        .from("voting_sessions")
-        .delete()
-        .in(
-          "voter_id",
-          testVoterIds
-        );
+    const {
+      error: sessionDeleteError,
+    } = await supabaseAdmin
+      .from("voting_sessions")
+      .delete()
+      .in(
+        "voter_id",
+        testVoterIds
+      );
 
     if (sessionDeleteError) {
       console.error(
@@ -190,22 +212,17 @@ export async function POST() {
 
     // ====================================================
     // HAPUS VOTER TEST
-    //
-    // Karena sistem voting memisahkan identitas voter
-    // dari ballot, penghapusan voter tidak menyentuh
-    // ballot umum di sini.
-    //
-    // Namun data TEST memang hanya data pengujian.
     // ====================================================
 
-    const { error: voterDeleteError } =
-      await supabaseAdmin
-        .from("voters")
-        .delete()
-        .in(
-          "id",
-          testVoterIds
-        );
+    const {
+      error: voterDeleteError,
+    } = await supabaseAdmin
+      .from("voters")
+      .delete()
+      .in(
+        "id",
+        testVoterIds
+      );
 
     if (voterDeleteError) {
       console.error(
@@ -224,41 +241,43 @@ export async function POST() {
     }
 
     // ====================================================
-    // CATAT AUDIT
+    // AUDIT LOG
     // ====================================================
 
-    const { error: auditError } =
-      await supabaseAdmin
-        .from("audit_logs")
-        .insert({
-          election_id: election.id,
-          event_type:
-            "test_voters_deleted",
-          metadata: {
-            deleted_count:
-              testVoters.length,
-            deleted_voters:
-              testVoters.map(
-                (voter) => ({
-                  nisn:
-                    voter.voter_code,
-                  nama:
-                    voter.full_name,
-                })
-              ),
-          },
-        });
+    const {
+      error: auditError,
+    } = await supabaseAdmin
+      .from("audit_logs")
+      .insert({
+        election_id:
+          election.id,
+        event_type:
+          "test_voters_deleted",
+        metadata: {
+          deleted_count:
+            testVoters.length,
+          deleted_voters:
+            testVoters.map(
+              (voter) => ({
+                nisn:
+                  voter.voter_code,
+                nama:
+                  voter.full_name,
+              })
+            ),
+        },
+      });
 
     if (auditError) {
       console.error(
         "Audit log error:",
         auditError
       );
-
-      // Data sudah terhapus.
-      // Jangan menggagalkan operasi hanya karena
-      // audit log gagal.
     }
+
+    // ====================================================
+    // SELESAI
+    // ====================================================
 
     return NextResponse.json({
       success: true,
@@ -266,7 +285,8 @@ export async function POST() {
         testVoters.length,
       deleted_voters:
         testVoters.map(
-          (voter) => voter.voter_code
+          (voter) =>
+            voter.voter_code
         ),
       message:
         `Berhasil menghapus ${testVoters.length} data pemilih test.`,
